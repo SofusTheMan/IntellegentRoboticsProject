@@ -1,5 +1,6 @@
 from controller import Supervisor
 import random
+import math, random
 
 supervisor = Supervisor()
 timeStep = int(supervisor.getBasicTimeStep())
@@ -106,11 +107,15 @@ def generate_grid_maze(n=4, side_length=4, wall_cell_ratio=0.1, z_height=0.25, e
 
 
 class MazeGraph:
-    def __init__(self, rows, cols=None):
+    def __init__(self, rows, cols=None, side_length=4, wall_cell_ratio=0.1):
+        
         self.rows = rows
         if cols is None:
             cols = rows
         self.cols = cols
+        self.side_length = side_length
+        self.wall_cell_ratio = wall_cell_ratio
+        self.side_length = side_length
         self.cells = {
             (x, y): {"N": True, "S": True, "E": True, "W": True}
             for x in range(rows) for y in range(cols)
@@ -172,13 +177,13 @@ class MazeGraph:
                 if present:
                     segments.append((x, y, side))
         return segments
-    
-    def generate_maze(self, side_length=4, wall_cell_ratio=0.1, z_height=0.25, floor_height=0.1):
-        n = maze_graph.rows
-        wall_width = wall_cell_ratio * side_length / n
-        cell_size = (side_length - (n + 1) * wall_width) / n
 
-        create_floor(width=side_length, length=side_length, height=floor_height)
+    def generate_maze(self, z_height=0.25, floor_height=0.1):
+        n = maze_graph.rows
+        wall_width = self.wall_cell_ratio * self.side_length / n
+        cell_size = (self.side_length - (n + 1) * wall_width) / n
+
+        create_floor(width=self.side_length, length=self.side_length, height=floor_height)
 
         # Build walls based on maze_graph's wall lists
         for (x, y, side) in maze_graph.wall_lists():
@@ -204,15 +209,49 @@ class MazeGraph:
                 x = i * (cell_size + wall_width)
                 y = j * (cell_size + wall_width)
                 create_wall(x, y, 0, length=wall_width, width=wall_width, height=z_height)
+    def spawn_epuck_in_maze(self):
+        n = self.rows
+        m = self.cols
+
+        # match the same dimensions used when generating the maze
+        side_length = self.side_length
+        wall_cell_ratio = self.wall_cell_ratio
+        wall_width = wall_cell_ratio * side_length / n
+        cell_size = (side_length - (n + 1) * wall_width) / n
+
+        # choose random cell
+        cx = random.randrange(n)
+        cy = random.randrange(m)
+
+        # compute world coordinates of the cell centre
+        tx = wall_width + cx * (cell_size + wall_width) + cell_size / 2.0
+        ty = wall_width + cy * (cell_size + wall_width) + cell_size / 2.0
+        tz = 0.035  # approximate e-puck half-height so it sits on the floor
+
+        # choose cardinal orientation and convert to Webots axis-angle (rotate about +Z)
+        orientation = random.choice(['E', 'N', 'W', 'S'])
+        angle_map = {'E': 0.0, 'N': math.pi / 2.0, 'W': math.pi, 'S': -math.pi / 2.0}
+        angle = angle_map[orientation]
+
+        epuck_node = f'''
+        E-puck {{
+          translation {tx} {ty} {tz}
+          rotation 0 0 1 {angle}
+          name "e_puck_{cx}_{cy}"
+            controller "epuck_maze_controller"
+        }}
+        '''
+
+        root = supervisor.getRoot()
+        children_field = root.getField("children")
+        children_field.importMFNodeFromString(-1, epuck_node)
+        print(f"Spawned e-puck at cell ({cx},{cy}) facing {orientation}")
+        return (cx, cy, orientation)
 
 
 
+def maze_generator_DFS(maze_graph):
 
-def maze_generator_DFS(rows, cols=None):
-    if cols is None:
-        cols = rows
-
-    maze_graph = MazeGraph(rows=rows, cols=cols)
     start_cell = (0, 0)
     stack = [start_cell]
     visited = {start_cell}
@@ -235,17 +274,16 @@ def maze_generator_DFS(rows, cols=None):
     maze_graph.carve_exit()
     return maze_graph
 
-
-
-
-
 # create the graph object describing a 10x10 maze (used later by an actual maze generator)
-maze_graph = maze_generator_DFS(15)
+maze_graph = MazeGraph(10, side_length=2, wall_cell_ratio=0.1)
+maze_graph = maze_generator_DFS(maze_graph)
 
 
 
 print("Generating maze on X–Y plane...")
 # generate_grid_maze(n=10, side_length=4, wall_cell_ratio=0.05, z_height=0.1, entrance=('N', 1), floor_height=0.05)
-maze_graph.generate_maze(side_length=4, wall_cell_ratio=0.1, z_height=0.2, floor_height=0.05)
+maze_graph.generate_maze(z_height=0.05, floor_height=0.05)
+maze_graph.spawn_epuck_in_maze()
+
 while supervisor.step(timeStep) != -1:
     pass
