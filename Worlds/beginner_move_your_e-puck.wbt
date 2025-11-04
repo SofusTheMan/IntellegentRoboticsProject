@@ -1,0 +1,19 @@
+#VRML_SIM R2025a utf8
+
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/backgrounds/protos/TexturedBackground.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/backgrounds/protos/TexturedBackgroundLight.proto"
+
+WorldInfo {
+}
+Viewpoint {
+  orientation 0.2637466690753277 -0.2087258540395004 -0.9417383991359547 5.100165912156213
+  position -1.9306029382116685 -4.156331650171036 1.574096147041298
+}
+TexturedBackground {
+}
+TexturedBackgroundLight {
+}
+Robot {
+  controller "maze_generator"
+  supervisor TRUE
+}
