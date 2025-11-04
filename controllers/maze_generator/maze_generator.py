@@ -86,7 +86,12 @@ def generate_grid_maze(n=4, cell_size=1.0, wall_width=0.1, z_height=0.25, entran
             x = wall_width + col * (cell_size + wall_width)
             y = row * (cell_size + wall_width)
             create_wall(x, y, 0, length=cell_size, width=wall_width, height=z_height)
-    
+    # add square corner blocks at every grid intersection so walls meet cleanly
+    for i in range(n + 1):
+        for j in range(n + 1):
+            x = i * (cell_size + wall_width)
+            y = j * (cell_size + wall_width)
+            create_wall(x, y, 0, length=wall_width, width=wall_width, height=z_height)
 
 # Example wrapper that creates a 4x4 maze with cell_size=1 and wall_width=0.1
 # and an exit on the north side at cell index 1 (change entrance as needed).
