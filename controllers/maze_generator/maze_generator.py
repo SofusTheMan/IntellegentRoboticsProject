@@ -26,10 +26,10 @@ def create_floor():
     children_field.importMFNodeFromString(-1, floor_string)
 
 # Create a wall at given position (Z is up)
-def create_wall(x, y, z=0.25, length=1.0, width=0.1, height=0.5):
+def create_wall(x, y, z=0.25, length=1.0, width=0.1, height=0.2):
     wall_string = f"""
     Solid {{
-      translation {x} {y} {z}
+      translation {x+length/2} {y + width/2} {z- height/2}
       children [
         Shape {{
           appearance Appearance {{
@@ -52,13 +52,12 @@ def generate_simple_maze():
     cell_size = 1.0
 
     # Outer walls around a 5x5 area
-    for i in range(-2, 3):
+    for i in range(-2, 2):
         # Leave one exit on the top wall (y = 2)
-        if i != 0:
-            create_wall(i, 2, z_height, length=1.0, width=0.1)
+        create_wall(i, 2, z_height, length=1.0, width=0.1)
         create_wall(i, -2, z_height, length=1.0, width=0.1)
 
-    for j in range(-1, 2):
+    for j in range(-2, 2):
         create_wall(-2, j, z_height, length=0.1, width=1.0)
         create_wall(2, j, z_height, length=0.1, width=1.0)
 
