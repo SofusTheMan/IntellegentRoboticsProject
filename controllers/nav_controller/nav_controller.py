@@ -32,6 +32,7 @@ MAX_STEPS = 600
 
 while robot.step(dt) != -1 and steps < MAX_STEPS:
     ir = irs.read()
+    print("IR:", ["{:.1f}".format(v) for v in ir])
 
     # print once to check which indices spike near walls
     # print(ir); break
