@@ -275,7 +275,7 @@ def maze_generator_DFS(maze_graph):
     return maze_graph
 
 # create the graph object describing a 10x10 maze (used later by an actual maze generator)
-maze_graph = MazeGraph(10, side_length=2, wall_cell_ratio=0.1)
+maze_graph = MazeGraph(15, side_length=3, wall_cell_ratio=0.1)
 maze_graph = maze_generator_DFS(maze_graph)
 
 
