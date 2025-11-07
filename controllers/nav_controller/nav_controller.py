@@ -10,7 +10,7 @@ LEFT_MOTOR  = "left wheel motor"
 RIGHT_MOTOR = "right wheel motor"
 
 # ===== TUNE THESE TWO =====
-CELL_SIZE_M = 0.15   # meters per grid cell (calibrate once)
+CELL_SIZE_M = 0.9   # meters per grid cell (calibrate once)
 IR_THRESHOLD = 80.0  # higher => more “sensitive” to walls
 # =========================
 
