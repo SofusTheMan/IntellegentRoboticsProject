@@ -238,7 +238,7 @@ class MazeGraph:
           translation {tx} {ty} {tz}
           rotation 0 0 1 {angle}
           name "e_puck_{cx}_{cy}"
-            controller "epuck_maze_controller"
+            controller "nav_controller"
         }}
         '''
 
