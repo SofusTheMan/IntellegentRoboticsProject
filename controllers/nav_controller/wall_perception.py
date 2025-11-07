@@ -24,7 +24,8 @@ class WallPerception:
         RIGHT  = max(ir_values[2], ir_values[3])
         LEFT   = max(ir_values[5], ir_values[6])
         BEHIND = max(ir_values[1], ir_values[4])
-
+        print(f"IR Values - F: {FRONT}, R: {RIGHT}, L: {LEFT}, B: {BEHIND}")
+        print(self.threshold)
         return Walls(
             front  = FRONT  >= self.threshold,
             right  = RIGHT  >= self.threshold,
