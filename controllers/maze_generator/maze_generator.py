@@ -5,7 +5,6 @@ import math, random
 supervisor = Supervisor()
 timeStep = int(supervisor.getBasicTimeStep())
 
-# Create a maze floor (on X–Y plane, Z = up)
 def create_floor(width=4, length=4, height=0.25):
     floor_string = f"""
     Solid {{
@@ -31,7 +30,6 @@ def create_floor(width=4, length=4, height=0.25):
     children_field.importMFNodeFromString(-1, floor_string)
 
 
-# Create a wall at given position (Z is up)
 def create_wall(x, y, z=0.25, length=1.0, width=0.1, height=0.2):
     wall_string = f"""
     Solid {{
@@ -56,7 +54,6 @@ def create_wall(x, y, z=0.25, length=1.0, width=0.1, height=0.2):
     children_field = root.getField("children")
     children_field.importMFNodeFromString(-1, wall_string)
 
-# Generate a grid maze where cell_size and wall_width are accounted for exactly.
 def generate_grid_maze(n=4, side_length=4, wall_cell_ratio=0.1, z_height=0.25, entrance=None, floor_height=0.1):
     """
     n: number of cells per side (n x n)
@@ -70,10 +67,8 @@ def generate_grid_maze(n=4, side_length=4, wall_cell_ratio=0.1, z_height=0.25, e
 
     create_floor(width=side_length, length=side_length, height=floor_height)
 
-    # Vertical wall segments (n+1 columns, each with n segments of height=cell_size)
     for col in range(n + 1):
         for row in range(n):
-            # optional entrance on left/right outer vertical walls
             if entrance:
                 side, idx = entrance
                 if side == 'W' and col == 0 and row == idx:
@@ -84,10 +79,8 @@ def generate_grid_maze(n=4, side_length=4, wall_cell_ratio=0.1, z_height=0.25, e
             y = wall_width + row * (cell_size + wall_width)
             create_wall(x, y, 0, length=wall_width, width=cell_size, height=z_height)
 
-    # Horizontal wall segments (n+1 rows, each with n segments of length=cell_size)
     for row in range(n + 1):
         for col in range(n):
-            # optional entrance on top/bottom outer horizontal walls
             if entrance:
                 side, idx = entrance
                 if side == 'S' and row == 0 and col == idx:
@@ -97,7 +90,6 @@ def generate_grid_maze(n=4, side_length=4, wall_cell_ratio=0.1, z_height=0.25, e
             x = wall_width + col * (cell_size + wall_width)
             y = row * (cell_size + wall_width)
             create_wall(x, y, 0, length=cell_size, width=wall_width, height=z_height)
-    # add square corner blocks at every grid intersection so walls meet cleanly
     for i in range(n + 1):
         for j in range(n + 1):
             x = i * (cell_size + wall_width)
@@ -125,7 +117,6 @@ class MazeGraph:
         return 0 <= x < self.rows and 0 <= y < self.cols
 
     def neighbors(self, x, y):
-        # Note the direction order matches the drawing logic:
         deltas = [(0, 1, "N"), (0, -1, "S"), (1, 0, "E"), (-1, 0, "W")]
         result = []
         for dx, dy, d in deltas:
@@ -138,7 +129,6 @@ class MazeGraph:
         (x1, y1), (x2, y2) = a, b
         dx, dy = x2 - x1, y2 - y1
         if (dx, dy) == (0, 1):
-            # b is north of a
             self.cells[(x1, y1)]["N"] = False
             self.cells[(x2, y2)]["S"] = False
         elif (dx, dy) == (0, -1):
@@ -152,7 +142,6 @@ class MazeGraph:
             self.cells[(x2, y2)]["E"] = False
 
     def carve_exit(self):
-        # choose a random side and carve a single exit
         side = random.choice(["N", "S", "E", "W"])
         if side in ["N", "S"]:
             idx = random.randint(0, self.cols - 1)
@@ -174,7 +163,7 @@ class MazeGraph:
         segments = []
         for (x, y), walls in self.cells.items():
             for side, present in walls.items():
-                if present:
+              if present and (side=="N" or side=="S" and y==0 or side=="E" and x==self.cols-1 or side=="W"):
                     segments.append((x, y, side))
         return segments
 
@@ -185,7 +174,6 @@ class MazeGraph:
 
         create_floor(width=self.side_length, length=self.side_length, height=floor_height)
 
-        # Build walls based on maze_graph's wall lists
         for (x, y, side) in maze_graph.wall_lists():
             if side == "N":
                 wx = wall_width + x * (cell_size + wall_width)
@@ -213,22 +201,18 @@ class MazeGraph:
         n = self.rows
         m = self.cols
 
-        # match the same dimensions used when generating the maze
         side_length = self.side_length
         wall_cell_ratio = self.wall_cell_ratio
         wall_width = wall_cell_ratio * side_length / n
         cell_size = (side_length - (n + 1) * wall_width) / n
 
-        # choose random cell
         cx = random.randrange(n)
         cy = random.randrange(m)
 
-        # compute world coordinates of the cell centre
         tx = wall_width + cx * (cell_size + wall_width) + cell_size / 2.0
         ty = wall_width + cy * (cell_size + wall_width) + cell_size / 2.0
-        tz = 0.035  # approximate e-puck half-height so it sits on the floor
+        tz = 0.035 
 
-        # choose cardinal orientation and convert to Webots axis-angle (rotate about +Z)
         orientation = random.choice(['E', 'N', 'W', 'S'])
         angle_map = {'E': 0.0, 'N': math.pi / 2.0, 'W': math.pi, 'S': -math.pi / 2.0}
         angle = angle_map[orientation]
@@ -255,15 +239,16 @@ def maze_generator_DFS(maze_graph):
     start_cell = (0, 0)
     stack = [start_cell]
     visited = {start_cell}
+    
 
     while stack:
+        unvisited_neighbors = []
         x, y = stack[-1]
-        unvisited_neighbors = [
-            (nx, ny)
-            for nx, ny, _ in maze_graph.neighbors(x, y)
-            if (nx, ny) not in visited
-        ]
-        if unvisited_neighbors:
+        for nx, ny, _ in maze_graph.neighbors(x, y):
+            if (nx, ny) not in visited:
+                unvisited_neighbors.append((nx, ny))
+
+        if len(unvisited_neighbors) > 0:
             next_cell = random.choice(unvisited_neighbors)
             maze_graph.remove_wall_between((x, y), next_cell)
             visited.add(next_cell)
@@ -274,7 +259,6 @@ def maze_generator_DFS(maze_graph):
     maze_graph.carve_exit()
     return maze_graph
 
-# create the graph object describing a 10x10 maze (used later by an actual maze generator)
 
 def maze_hex_size(n, hex_size=1.0, wall_cell_ratio=0.1):
 
@@ -287,7 +271,6 @@ maze_graph = maze_generator_DFS(maze_graph)
 
 
 print("Generating maze on X–Y plane...")
-# generate_grid_maze(n=10, side_length=4, wall_cell_ratio=0.05, z_height=0.1, entrance=('N', 1), floor_height=0.05)
 maze_graph.generate_maze(z_height=0.05, floor_height=0.05)
 maze_graph.spawn_epuck_in_maze()
 
