@@ -168,35 +168,51 @@ class MazeGraph:
         return segments
 
     def generate_maze(self, z_height=0.25, floor_height=0.1):
-        n = maze_graph.rows
-        wall_width = self.wall_cell_ratio * self.side_length / n
-        cell_size = (self.side_length - (n + 1) * wall_width) / n
+        n = self.rows
 
         create_floor(width=self.side_length, length=self.side_length, height=floor_height)
 
-        for (x, y, side) in maze_graph.wall_lists():
-            if side == "N":
-                wx = wall_width + x * (cell_size + wall_width)
-                wy = (y + 1) * (cell_size + wall_width)
-                create_wall(wx, wy, 0, length=cell_size, width=wall_width, height=z_height)
-            elif side == "S":
-                wx = wall_width + x * (cell_size + wall_width)
-                wy = y * (cell_size + wall_width)
-                create_wall(wx, wy, 0, length=cell_size, width=wall_width, height=z_height)
-            elif side == "E":
-                wx = (x + 1) * (cell_size + wall_width)
-                wy = wall_width + y * (cell_size + wall_width)
-                create_wall(wx, wy, 0, length=wall_width, width=cell_size, height=z_height)
-            elif side == "W":
-                wx = x * (cell_size + wall_width)
-                wy = wall_width + y * (cell_size + wall_width)
-                create_wall(wx, wy, 0, length=wall_width, width=cell_size, height=z_height)
-        # add square corner blocks at every grid intersection so walls meet cleanly
+        for (x, y, side) in self.wall_lists():
+            self.place_wall_from_cell_side(x, y, side, z_height)
+
+        wall_width = self.wall_cell_ratio * self.side_length / n
+        cell_size  = (self.side_length - (n + 1) * wall_width) / n
+
         for i in range(n + 1):
             for j in range(n + 1):
-                x = i * (cell_size + wall_width)
-                y = j * (cell_size + wall_width)
-                create_wall(x, y, 0, length=wall_width, width=wall_width, height=z_height)
+                wx = i * (cell_size + wall_width)
+                wy = j * (cell_size + wall_width)
+                create_wall(wx, wy, 0, length=wall_width, width=wall_width, height=z_height)
+
+
+    def place_wall_from_cell_side(self, x, y, side, z_height):
+        n = self.rows
+        wall_width = self.wall_cell_ratio * self.side_length / n
+        cell_size  = (self.side_length - (n + 1) * wall_width) / n
+
+        base_x = x * (cell_size + wall_width)
+        base_y = y * (cell_size + wall_width)
+
+        if side == "N":
+            wx = wall_width + base_x
+            wy = base_y + cell_size + wall_width
+            create_wall(wx, wy, 0, length=cell_size, width=wall_width, height=z_height)
+
+        elif side == "S":
+            wx = wall_width + base_x
+            wy = base_y
+            create_wall(wx, wy, 0, length=cell_size, width=wall_width, height=z_height)
+
+        elif side == "E":
+            wx = base_x + cell_size + wall_width
+            wy = wall_width + base_y
+            create_wall(wx, wy, 0, length=wall_width, width=cell_size, height=z_height)
+
+        elif side == "W":
+            wx = base_x
+            wy = wall_width + base_y
+            create_wall(wx, wy, 0, length=wall_width, width=cell_size, height=z_height)
+
     def spawn_epuck_in_maze(self):
         n = self.rows
         m = self.cols
