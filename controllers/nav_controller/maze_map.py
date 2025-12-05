@@ -6,8 +6,8 @@ NORTH, EAST, SOUTH, WEST = 0, 1, 2, 3
 
 @dataclass
 class Cell:
-    # IMPORTANT: start as if every side is a wall (True).
-    # When we sense "no wall" we flip it to False.
+    # starts as if every side is a wall (True).
+    # when it senses "no wall" it flips to False.
     wallN: bool = True
     wallE: bool = True
     wallS: bool = True
@@ -82,7 +82,7 @@ class MazeMap:
 
         # NORTH neighbour is r-1
         if not cell.wallN and self.in_bounds(r - 1, c):
-            result.append((r - 1, c, NORTH))
+            result.append((r - 1, c, NORTH))  #North
 
         # EAST neighbour is c+1
         if not cell.wallE and self.in_bounds(r, c + 1):
