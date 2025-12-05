@@ -1,17 +1,3 @@
-# nav_controller.py
-#
-# Simultaneous Maze Navigation and Localization Robot
-# - Particle filter localization with unknown starting position
-# - Map building during exploration
-# - Dijkstra path planning to goal
-# - Goal-oriented navigation combining localization and planning
-#
-# Matches Project Proposal:
-# - Particle filter-based localization (Abdullahi)
-# - Path planning with Dijkstra (Anas)
-# - Integration of localization + navigation (All)
-# - Decision-making: choose action with highest probability of success
-
 from controller import Robot
 from motion_primitives import MotionPrimitives
 from sensors import IRSuite
@@ -33,7 +19,7 @@ CELL_SIZE_M = 0.09  # Actual cell size after walls
 IR_THRESHOLD = 80.0  # Wall detection threshold
 
 # Goal: Exit detection (edge cell with no wall = exit)
-# We'll detect exit dynamically by checking edge cells with open walls
+# detects exit dynamically by checking edge cells with open walls
 GOAL_ROW = None  # Will be detected
 GOAL_COL = None  # Will be detected
 
@@ -226,9 +212,9 @@ def get_action_to_cell(current_cell, next_cell, current_theta):
     
     angle_diff_deg = math.degrees(angle_diff)
     
-    # CRITICAL: Use very lenient threshold - if close to correct direction, go forward
+
     # This prevents unnecessary turns when robot is already facing roughly the right way
-    if abs(angle_diff_deg) < 45:  # Very lenient threshold (45 degrees)
+    if abs(angle_diff_deg) < 45:  # threshold (45 degrees)
         return ('forward', 0)
     else:
         # Normalize large turns to 90-degree increments to prevent oscillation
@@ -248,19 +234,19 @@ def check_wall_during_movement():
     walls_current = wp.classify(ir_current)
     
     # Stop only if a wall is detected directly in front.
-    # We rely on the classification threshold (IR_THRESHOLD) and avoid extra raw checks
+    # relys on the classification threshold (IR_THRESHOLD) and avoid extra raw checks
     # so the robot stays flexible in narrow corridors.
     return walls_current.front
 
 
 def execute_action(action, walls, ir_readings=None):
-    """Execute the planned action safely with sensor checks."""
+    
     action_type, value = action
     
     if action_type == 'forward':
-        # CRITICAL: Always re-check sensors before moving forward
+        # Always rechecks sensors before moving forward
         if ir_readings is not None:
-            # Re-read sensors to ensure no wall (use same threshold as wall detection)
+            # Reread sensors to ensure no wall (use same threshold as wall detection)
             current_walls = wp.classify(ir_readings)
             if current_walls.front:
                 print("  [SAFETY] Front blocked (sensor check), cannot move forward")
@@ -392,7 +378,7 @@ while robot.step(dt) != -1 and steps < MAX_STEPS:
     # Track if we moved this step
     action_executed_this_step = False
     
-    # CONTINUOUS EXIT DETECTION AND CHECKING (every step, not just after step 20)
+    
     exit_cell = detect_exit(current_cell[0], current_cell[1], walls, est_theta, ir)
     
     # Detect exit (goal) if not already detected
@@ -404,23 +390,21 @@ while robot.step(dt) != -1 and steps < MAX_STEPS:
             print(f"\n[EXIT DETECTED] Goal set to cell ({GOAL_ROW}, {GOAL_COL})")
             print(f"  Robot at edge cell, sensors confirm no wall = EXIT!")
     
-    # Check if we've reached the exit - CONTINUOUS CHECK (every step, BEFORE and AFTER movement)
+    # Check if it has reached the exit - (every step, BEFORE and AFTER movement)
     if moved_at_least_once:
-        # Check if at exit cell with no wall - USE MORE LENIENT THRESHOLD
+        # Check if at exit cell with no wall 
         is_at_exit = False
         front_sensors = [ir[0], ir[7]]
         max_front = max(front_sensors)
         
-        # Check if we're at an edge cell
+        # Check if it is at an edge cell
         is_north_edge = (current_cell[0] == 0)
         is_south_edge = (current_cell[0] == MAZE_ROWS - 1)
         is_east_edge = (current_cell[1] == MAZE_COLS - 1)
         is_west_edge = (current_cell[1] == 0)
         is_at_edge = is_north_edge or is_south_edge or is_east_edge or is_west_edge
         
-        # CRITICAL: If at edge AND sensors show very low readings (no wall) = EXIT
-        # Use very lenient threshold - exit should have very low sensor readings (almost no reading)
-        # Lower threshold to catch exit more reliably
+        
         if is_at_edge and not walls.front and max_front < IR_THRESHOLD * 0.4:
             is_at_exit = True
             # Set goal if not already set
@@ -430,39 +414,39 @@ while robot.step(dt) != -1 and steps < MAX_STEPS:
                 planner.set_goal_cells([(GOAL_ROW, GOAL_COL)])
                 print(f"\n[EXIT DETECTED] Goal set to cell ({GOAL_ROW}, {GOAL_COL})")
         
-        # Method 1: If goal detected, check if at goal cell - SIMPLIFIED CHECK
+        
         if goal_detected:
-            # Check if we're at the goal cell - if so, check sensors more leniently
+            
             if current_cell == (GOAL_ROW, GOAL_COL):
-                # At goal cell - if no wall detected, we're at exit!
+                
                 if not walls.front:
                     is_at_exit = True
-                # Even if walls.front is True, if sensors are very low, we might be at exit
+                
                 elif max_front < IR_THRESHOLD * 0.5:
                     is_at_exit = True
             
-            # Also check if we're adjacent to goal and moving toward it with no wall
-            dr = GOAL_ROW - current_cell[0]  # Direction TO goal (not FROM)
-            dc = GOAL_COL - current_cell[1]  # Direction TO goal (not FROM)
-            if abs(dr) + abs(dc) == 1:  # Adjacent to goal
-                # Check if we're facing the goal and sensors show no wall
+            
+            dr = GOAL_ROW - current_cell[0]  
+            dc = GOAL_COL - current_cell[1]  
+            if abs(dr) + abs(dc) == 1:  
+                
                 theta_norm = est_theta % (2 * math.pi)
                 facing_goal = False
                 
                 # Check if orientation matches direction TO goal
-                if dr == 1 and abs(theta_norm - math.pi/2) < 0.5:  # Goal is North, facing North
+                if dr == 1 and abs(theta_norm - math.pi/2) < 0.5:  
                     facing_goal = True
-                elif dr == -1 and (abs(theta_norm + math.pi/2) < 0.5 or abs(theta_norm - 3*math.pi/2) < 0.5):  # Goal is South, facing South
+                elif dr == -1 and (abs(theta_norm + math.pi/2) < 0.5 or abs(theta_norm - 3*math.pi/2) < 0.5):  
                     facing_goal = True
-                elif dc == 1 and (abs(theta_norm) < 0.5 or abs(theta_norm - 2*math.pi) < 0.5):  # Goal is East, facing East
+                elif dc == 1 and (abs(theta_norm) < 0.5 or abs(theta_norm - 2*math.pi) < 0.5):  
                     facing_goal = True
-                elif dc == -1 and abs(theta_norm - math.pi) < 0.5:  # Goal is West, facing West
+                elif dc == -1 and abs(theta_norm - math.pi) < 0.5:  
                     facing_goal = True
                 
                 if facing_goal and not walls.front and max_front < IR_THRESHOLD * 0.4:
                     is_at_exit = True
         
-        # Method 2: Always check if at edge with no wall (even if goal not detected yet)
+        # checks if at edge with no wall (even if goal not detected yet)
         if exit_cell and exit_cell == current_cell:
             if not walls.front and max_front < IR_THRESHOLD * 0.4:
                 is_at_exit = True
@@ -472,9 +456,9 @@ while robot.step(dt) != -1 and steps < MAX_STEPS:
                     goal_detected = True
                     planner.set_goal_cells([(GOAL_ROW, GOAL_COL)])
         
-        # CRITICAL: If at goal cell and goal is detected, prioritize exit check
+        # If at goal cell and goal is detected, prioritize exit check
         if goal_detected and current_cell == (GOAL_ROW, GOAL_COL):
-            # We're at the goal cell - if sensors show no wall, we're done!
+            # If sensors show no wall, we're done!
             if not walls.front or max_front < IR_THRESHOLD * 0.6:
                 is_at_exit = True
         
@@ -492,20 +476,20 @@ while robot.step(dt) != -1 and steps < MAX_STEPS:
             print(f"{'='*60}")
             break
     
-    # Decision-making: Choose action with highest probability of success
-    # Strategy: Use Dijkstra path planning if we have a good estimate, otherwise explore
+    # Decision making, so it chooses action with highest probability of success
+    # Use Dijkstra path planning if we have a good estimate, otherwise explore
     
     localized = is_localized()
     
-    # CRITICAL: If already at goal, don't try to plan - just check if we should declare success
+    # If already at goal, don't try to plan - just check if we should declare success
     if goal_detected and current_cell == (GOAL_ROW, GOAL_COL):
-        # We're at the goal cell - check sensors one more time
+        # it is at the goal cell, so sensors check one more time
         front_sensors_check = [ir[0], ir[7]]
         max_front_check = max(front_sensors_check)
         walls_check = wp.classify(ir)
         
         if not walls_check.front or max_front_check < IR_THRESHOLD * 0.6:
-            # We're at goal and sensors confirm no wall = EXIT REACHED!
+            # it s at goal and sensors confirm no wall = EXIT REACHED!
             mp.stop()
             print(f"\n{'='*60}")
             print(f"✓ GOAL REACHED at step {steps}!")
@@ -516,26 +500,26 @@ while robot.step(dt) != -1 and steps < MAX_STEPS:
             print(f"{'='*60}")
             break
     
-    # Only use path planning if goal is detected AND we're not already at goal
+    # Only used path planning if goal is detected AND we're not already at goal
     if goal_detected and (localized or steps > 50) and current_cell != (GOAL_ROW, GOAL_COL):  # Use path planning after some exploration
         exploration_mode = False
         
         # Plan path using Dijkstra
-        planner.flood_fill(maze_map)  # Update costs
+        planner.flood_fill(maze_map)  
         path = planner.dijkstra(maze_map, current_cell, (GOAL_ROW, GOAL_COL))
         
         if path and len(path) > 1:
             current_path = path
-            next_cell = path[1]  # Next cell in path
+            next_cell = path[1]  # Nextcell in pathh
             
-            # CRITICAL: Check if next cell is the exit BEFORE moving
+            
             if next_cell == (GOAL_ROW, GOAL_COL) or current_cell == (GOAL_ROW, GOAL_COL):
-                # We're at or moving to exit - check if we should stop
+                # it's at or moving to exit - checks if should stop
                 front_sensors = [ir[0], ir[7]]
                 max_front = max(front_sensors)
-                # Use more lenient threshold - exit should have very low readings
+                # alot of lenient threshold  - exit should have very low readings
                 if not walls.front and max_front < IR_THRESHOLD * 0.4:
-                    # At exit - STOP!
+                    # At exit - SHOULDSTOP!
                     mp.stop()
                     print(f"\n{'='*60}")
                     print(f"✓ EXIT REACHED at step {steps}!")
@@ -546,7 +530,7 @@ while robot.step(dt) != -1 and steps < MAX_STEPS:
                     print(f"{'='*60}")
                     break
             
-            # Don't plan if next cell is the same as current (prevent oscillation)
+           
             if next_cell != current_cell:
                 action = get_action_to_cell(current_cell, next_cell, est_theta)
                 
@@ -569,7 +553,7 @@ while robot.step(dt) != -1 and steps < MAX_STEPS:
                     
                     # Only execute if not stuck in loop
                     if action_repeat_count < MAX_ACTION_REPEATS:
-                        # CRITICAL: If action is forward and no wall, execute it
+                        # If action is forward and no wall, execute it
                         # Don't let path planning override basic wall detection
                         if action[0] == 'forward':
                             # Check if there's actually a wall before moving
@@ -585,22 +569,22 @@ while robot.step(dt) != -1 and steps < MAX_STEPS:
                                     moved_at_least_once = True
                                     action_executed_this_step = True
                             else:
-                                # Wall detected - fall back to exploration
+                                # Wall detected, fall back to exploration
                                 print(f"  [WARN] Wall detected, switching to exploration...")
                                 action_executed_this_step = False  # Let exploration handle it
                         else:
-                            # Turn action - but check if we should go forward instead
+                            # check if it should go forward instead
                             # If no wall in front, prefer forward over turning
                             if not walls.front:
-                                # No wall - go forward instead of turning
+                                # No wall goes forward instead of turning
                                 if steps % 5 == 0:
                                     print(f"\n[STEP {steps}] No wall in front, going forward instead of turning")
                                 if execute_action(('forward', 0), walls, ir):
                                     moved_at_least_once = True
                                     action_executed_this_step = True
-                                    last_action = ('forward', 0)  # Update last action
+                                    last_action = ('forward', 0)  
                             else:
-                                # Wall in front - turn is necessary
+                                # Wall in front, turn is necessary
                                 if steps % 5 == 0:  # Print less frequently
                                     print(f"\n[STEP {steps}] Localized: {localized}, Navigating to exit")
                                     print(f"  Pose: ({est_x:.3f}, {est_y:.3f}, {math.degrees(est_theta):.1f}°)")
@@ -612,22 +596,22 @@ while robot.step(dt) != -1 and steps < MAX_STEPS:
                                     moved_at_least_once = True
                                     action_executed_this_step = True
                                 
-                                # Check again AFTER movement - might have passed through exit
-                                # Re-check sensors after movement
+                                # ckeck again after movement - might have passed through exit
+                                # recheck sensors after movement
                                 ir_after = irs.read()
                                 walls_after = wp.classify(ir_after)
                                 front_sensors_after = [ir_after[0], ir_after[7]]
                                 max_front_after = max(front_sensors_after)
                                 
-                                # Check if we're at an edge cell after movement
+                                # check if we're at an edge cell after movement
                                 is_at_edge_after = (
                                     current_cell[0] == 0 or current_cell[0] == MAZE_ROWS - 1 or
                                     current_cell[1] == 0 or current_cell[1] == MAZE_COLS - 1
                                 )
                                 
-                                # If at edge with no wall = exit
+                                # f at edge with no wall = exit
                                 if is_at_edge_after and not walls_after.front and max_front_after < IR_THRESHOLD * 0.4:
-                                    # Just passed through exit - STOP!
+                                    # Just passed through exit - stop
                                     mp.stop()
                                     print(f"\n{'='*60}")
                                     print(f"✓ EXIT REACHED at step {steps}!")
@@ -639,22 +623,22 @@ while robot.step(dt) != -1 and steps < MAX_STEPS:
                                     print(f"{'='*60}")
                                     break
             else:
-                # Path planning failed - fall back to exploration
-                # Don't print warning every step to reduce spam
+                # path planning failed, fall back to exploration
+                # doent print warning every step to reduce spam
                 if steps % 10 == 0:
                     print(f"  [WARN] Path planning issue, using exploration...")
-                # Let exploration mode handle it (will be handled below)
+                
                 action_executed_this_step = False
         else:
             # No path found - check if we're already at goal before warning
             if goal_detected and current_cell == (GOAL_ROW, GOAL_COL):
-                # We're at goal - check sensors and declare success
+                # it's at goal check sensors and declare success
                 front_sensors_check = [ir[0], ir[7]]
                 max_front_check = max(front_sensors_check)
                 walls_check = wp.classify(ir)
                 
                 if not walls_check.front or max_front_check < IR_THRESHOLD * 0.6:
-                    # We're at goal and sensors confirm no wall = EXIT REACHED!
+                    # it's at goal and sensors confirm no wall = EXIT REACHED
                     mp.stop()
                     print(f"\n{'='*60}")
                     print(f"✓ GOAL REACHED at step {steps}!")
@@ -666,13 +650,13 @@ while robot.step(dt) != -1 and steps < MAX_STEPS:
                     break
             else:
                 # No path found - use exploration mode
-                # Don't print warning every step
+                # doesn't print warning every step
                 if steps % 10 == 0:
                     print(f"  [WARN] No path to goal, exploring...")
-                # Let exploration mode handle it (will be handled below)
+                # let exploration mode handle it (will be handled below)
                 action_executed_this_step = False
     else:
-        # Exploration mode: Systematic path exploration with backtracking
+        # Systematic path exploration with backtracking
         exploration_mode = True
         if steps % 20 == 0:  # Print less frequently during exploration
             print(f"\n[STEP {steps}] Exploring (localizing...)")
@@ -696,12 +680,6 @@ while robot.step(dt) != -1 and steps < MAX_STEPS:
             print(f"\n[EXIT DETECTED] Goal set to cell ({GOAL_ROW}, {GOAL_COL})")
             print(f"  Robot at edge cell, sensors confirm no wall = EXIT!")
         
-        # EXPLORATION STRATEGY (matches proposal):
-        # 1. If no wall in front -> keep going forward (explore current path fully)
-        # 2. If wall in front -> stop and check right/left
-        # 3. If right/left open -> turn and explore that path
-        # 4. Only backtrack when ALL directions explored (true dead end)
-        
         # Reset directions tried if we moved to a new cell
         if last_visited_cell != current_cell:
             current_cell_directions_tried = set()
@@ -711,28 +689,23 @@ while robot.step(dt) != -1 and steps < MAX_STEPS:
         forward_cell = None
         theta_norm = est_theta % (2 * math.pi)
         current_direction = None
-        if abs(theta_norm) < 0.2 or abs(theta_norm - 2 * math.pi) < 0.2:  # East
+        if abs(theta_norm) < 0.2 or abs(theta_norm - 2 * math.pi) < 0.2:  
             forward_cell = (current_cell[0], current_cell[1] + 1)
             current_direction = 'E'
-        elif abs(theta_norm - math.pi / 2) < 0.2:  # North
+        elif abs(theta_norm - math.pi / 2) < 0.2:  
             forward_cell = (current_cell[0] - 1, current_cell[1])
             current_direction = 'N'
-        elif abs(theta_norm - math.pi) < 0.2:  # West
+        elif abs(theta_norm - math.pi) < 0.2:  
             forward_cell = (current_cell[0], current_cell[1] - 1)
             current_direction = 'W'
-        elif abs(theta_norm + math.pi / 2) < 0.2 or abs(theta_norm - 3 * math.pi / 2) < 0.2:  # South
+        elif abs(theta_norm + math.pi / 2) < 0.2 or abs(theta_norm - 3 * math.pi / 2) < 0.2:  
             forward_cell = (current_cell[0] + 1, current_cell[1])
             current_direction = 'S'
-
-        # SIMPLIFIED EXPLORATION STRATEGY:
-        # 1. If NO WALL in front → KEEP GOING FORWARD (always, explore path fully)
-        # 2. If WALL in front → stop and check right/left
-        # 3. Only backtrack when ALL directions blocked (dead end at end of path)
         
-        # PRIORITY 1: Keep moving forward if NO WALL detected
-        # Don't check if visited - just keep going forward until wall blocks us
+        
+        # doesn't check if visited - just keeps going forward until wall blocks it
         if not walls.front and forward_cell and maze_map.in_bounds(forward_cell[0], forward_cell[1]):
-            # CRITICAL: Check if forward cell is the exit BEFORE moving
+            # Check if forward cell is the exit before moving
             if goal_detected and forward_cell == (GOAL_ROW, GOAL_COL):
                 # About to move to exit - check sensors
                 front_sensors = [ir[0], ir[7]]
@@ -749,24 +722,24 @@ while robot.step(dt) != -1 and steps < MAX_STEPS:
                     print(f"{'='*60}")
                     break
             
-            # Keep going forward - don't stop just because cell is visited
+            # Keeps going forward - doesn't stop just because cell is visited
             move_success = execute_action(('forward', 0), walls, ir)
             if move_success:
                 moved_at_least_once = True
                 action_executed_this_step = True
                 
-                # CRITICAL: Check if we just moved to exit cell
-                # Re-estimate pose after movement
+                # Check if we just moved to exit cell
+                # reestimate pose after movement
                 est_x_after, est_y_after, est_theta_after = pf.estimate_pose()
                 current_cell_after = world_to_cell(est_x_after, est_y_after)
                 
-                # Re-read sensors after movement
+                # reread sensors after movement
                 ir_after = irs.read()
                 walls_after = wp.classify(ir_after)
                 front_sensors_after = [ir_after[0], ir_after[7]]
                 max_front_after = max(front_sensors_after)
                 
-                # Check if we're at exit cell after movement
+                # Check if it's at exit cell after movement
                 is_at_edge_after = (
                     current_cell_after[0] == 0 or current_cell_after[0] == MAZE_ROWS - 1 or
                     current_cell_after[1] == 0 or current_cell_after[1] == MAZE_COLS - 1
@@ -785,42 +758,42 @@ while robot.step(dt) != -1 and steps < MAX_STEPS:
                     print(f"{'='*60}")
                     break
 
-        # PRIORITY 2: Wall detected in front - check sides
+        # Wall detected in front - check sides
         elif walls.front:
-            # Wall in front - now check right/left
+            # Wall in front now check right/left
             if not walls.right:
-                # Right is open - turn right and explore that path
+                # Right is open turns right and explores that path
                 if execute_action(('turn', -90), walls, ir):
                     moved_at_least_once = True
                     action_executed_this_step = True
                     last_cell_before_turn = current_cell
             elif not walls.left:
-                # Left is open - turn left and explore that path
+                # Left is open turns left and explores that path
                 if execute_action(('turn', 90), walls, ir):
                     moved_at_least_once = True
                     action_executed_this_step = True
                     last_cell_before_turn = current_cell
             else:
-                # Dead end - all directions blocked (front, right, left)
-                # This means we've explored the entire path - now backtrack
+                # Dead end all directions blocked (front, right, left)
+                # This means it's explored the entire path now backtrack
                 if exploration_stack and last_cell_before_turn != current_cell:
-                    # Turn around via two 90° turns to backtrack
+                    
                     if execute_action(('turn', 90), walls, ir):
                         if execute_action(('turn', 90), walls, ir):
                             moved_at_least_once = True
                             action_executed_this_step = True
                             current_path_cells = []  # Clear path when backtracking
                 else:
-                    # No backtrack available - just turn around
+                    
                     if execute_action(('turn', 90), walls, ir):
                         if execute_action(('turn', 90), walls, ir):
                             moved_at_least_once = True
                             action_executed_this_step = True
     
-    # Only force action if we're truly stuck (shouldn't happen with simplified logic)
-    # But don't force unnecessary turns - only if we can't move forward and have no other option
+    # Only force action if it's truly stuck (shouldn't happen with simplified logic)
+    # But doesn't force unnecessary turns only if it can't move forward and have no other option
     if not action_executed_this_step and walls.front:
-        # Only force action if front is blocked and we haven't done anything
+        # Only forces action if front is blocked and it's not done anything
         if not walls.right:
             if execute_action(('turn', -90), walls, ir):
                 moved_at_least_once = True
