@@ -7,13 +7,13 @@ class Planner:
     def __init__(self, rows=5, cols=5):
         self.rows = rows
         self.cols = cols
-        self.goal_cells = [(rows // 2, cols // 2)]  # default: centre
+        self.goal_cells = [(rows // 2, cols // 2)]  
 
     def set_goal_cells(self, cells):
         """cells: list of (r,c) tuples."""
         self.goal_cells = cells
 
-    #Flood-fill for exploration and navigation
+    
     def flood_fill(self, maze: MazeMap):
         # reset costs
         for r in range(maze.rows):
@@ -45,9 +45,9 @@ class Planner:
                 best = (nr, nc, direction)
         return best  # or None
 
-    #Dijkstra shortest path 
+    # Dijkstra shortest path 
     def dijkstra(self, maze: MazeMap, start, goal):
-        """Grid-based Dijkstra from start to goal. Returns path as list of (r,c)."""
+        # Grid-based Dijkstra from start to goal. Returns path as list of (r,c) 
         pq = []
         heapq.heappush(pq, (0, start))
         dist = {start: 0}
