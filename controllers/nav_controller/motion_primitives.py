@@ -2,7 +2,7 @@ import math
 
 
 class MotionPrimitives:
-    """Basic motion for an e-puck-like diff-drive robot in Webots."""
+    
     def __init__(self, robot, left_motor, right_motor,
                  wheel_radius_m=0.0205, axle_length_m=0.052):
         self.robot = robot
@@ -61,11 +61,11 @@ class MotionPrimitives:
         self.turn_deg(+90.0)
 
     def forward_cells(self, n_cells, cell_size_m, check_sensors=None, stop_on_wall=True):
-        """
-        Move forward n_cells, checking sensors during movement.
-        If check_sensors is provided (function that returns True if wall detected),
-        will stop immediately if wall is detected.
-        """
+        
+        # Move forward n_cells, checking sensors during movement
+        # If check_sensors is provided (function that returns True if wall detected)
+        # Will stop immediately if wall is detected
+        
         distance_m = n_cells * cell_size_m
         wheel_speed = 0.05 / self.r
         wheel_speed = max(min(wheel_speed, self.max_ws), -self.max_ws)
@@ -81,14 +81,14 @@ class MotionPrimitives:
             if self.robot.step(self.dt) == -1:
                 break
             
-            # Check sensors during movement - stop immediately if wall detected
+            # Check sensors during movement, stop immediately if wall detected
             if check_sensors is not None and stop_on_wall:
                 if check_sensors():
                     # Emergency stop!
                     self.left.setVelocity(0.0)
                     self.right.setVelocity(0.0)
-                    self._step_secs(0.1)  # Brief settle
-                    return False  # Movement interrupted by wall
+                    self._step_secs(0.1)  
+                    return False  # False because the movement was interrupted by wall
         
         self.stop()
         return True
