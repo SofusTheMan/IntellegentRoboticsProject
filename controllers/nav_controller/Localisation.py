@@ -5,10 +5,10 @@ import math
 class ParticleFilter:
     def __init__(self, num_particles=200, maze_map=None, cell_size=0.09, 
                  maze_rows=5, maze_cols=5, maze_side_length=0.6):
-        """
-        Initialize particle filter for unknown starting position.
-        Particles are distributed across all possible positions in the maze.
-        """
+        
+        # Initialize particle filter for unknown starting position.
+        # Particles are distributed across all possible positions in the maze.
+        
         self.num_particles = num_particles
         self.maze_map = maze_map
         self.cell_size = cell_size
@@ -27,7 +27,7 @@ class ParticleFilter:
         self._initialize_particles()
         
     def _initialize_particles(self):
-        """Initialize particles uniformly across all cells with random orientations."""
+        # Initialize particles uniformly across all cells with random orientations
         wall_cell_ratio = 0.1
         wall_width = wall_cell_ratio * self.maze_side_length / self.maze_rows
         
