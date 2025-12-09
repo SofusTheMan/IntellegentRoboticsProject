@@ -227,7 +227,7 @@ class MazeGraph:
 
         tx = wall_width + cx * (cell_size + wall_width) + cell_size / 2.0
         ty = wall_width + cy * (cell_size + wall_width) + cell_size / 2.0
-        tz = 0.035 
+        tz = 0.0
 
         orientation = random.choice(['E', 'N', 'W', 'S'])
         angle_map = {'E': 0.0, 'N': math.pi / 2.0, 'W': math.pi, 'S': -math.pi / 2.0}
@@ -238,7 +238,7 @@ class MazeGraph:
           translation {tx} {ty} {tz}
           rotation 0 0 1 {angle}
           name "e_puck_{cx}_{cy}"
-            controller "nav_controller"
+            controller "simple_wall_follower"
         }}
         '''
 
@@ -281,7 +281,7 @@ def maze_hex_size(n, hex_size=1.0, wall_cell_ratio=0.1):
     side_length = n * hex_size
     return MazeGraph(n, side_length=side_length, wall_cell_ratio=wall_cell_ratio)
 
-maze_graph = maze_hex_size(5, hex_size=0.12, wall_cell_ratio=0.1)
+maze_graph = maze_hex_size(5, hex_size=0.1, wall_cell_ratio=0.1)
 maze_graph = maze_generator_DFS(maze_graph)
 
 
