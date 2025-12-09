@@ -226,6 +226,7 @@ class MazeGraph:
 
         cx = random.randrange(n)
         cy = random.randrange(m)
+        print(f"Spawning e-puck in cell ({cx},{cy})")
 
         tx = wall_width + cx * (cell_size + wall_width) + cell_size / 2.0
         ty = wall_width + cy * (cell_size + wall_width) + cell_size / 2.0
@@ -240,7 +241,7 @@ class MazeGraph:
           translation {tx} {ty} {tz}
           rotation 0 0 1 {angle}
           name "e_puck_{cx}_{cy}"
-            controller "simple_wall_follower"
+            controller "nav_controllerRemake"
         }}
         '''
 
@@ -296,7 +297,7 @@ def maze_hex_size(n, hex_size=1.0, wall_cell_ratio=0.1):
     side_length = n * hex_size
     return MazeGraph(n, side_length=side_length, wall_cell_ratio=wall_cell_ratio)
 
-maze_graph = maze_hex_size(5, hex_size=0.1, wall_cell_ratio=0.1)
+maze_graph = maze_hex_size(5, hex_size=0.09, wall_cell_ratio=0.1)
 maze_graph = maze_generator_DFS(maze_graph)
 
 
@@ -306,7 +307,7 @@ maze_graph.generate_maze(z_height=0.05, floor_height=0.05)
 maze_graph.spawn_epuck_in_maze()
 
 # Serialize MazeGraph to file for nav_controller
-maze_graph_file = os.path.join(os.path.dirname(__file__), '..', 'nav_controller', 'maze_graph.json')
+maze_graph_file = os.path.join(os.path.dirname(__file__), '..', 'nav_controllerRemake', 'maze_graph.json')
 maze_graph.serialize_to_file(maze_graph_file)
 
 while supervisor.step(timeStep) != -1:
