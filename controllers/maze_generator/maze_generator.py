@@ -1,11 +1,20 @@
 from controller import Supervisor
 import random
-import math, random
+import math
 import json
 import os
 
 supervisor = Supervisor()
 timeStep = int(supervisor.getBasicTimeStep())
+
+# ==================== CONFIGURATION ====================
+NUM_TRIALS = 100
+TRIAL_TIMEOUT = 9000.0
+RESULTS_FILE = "maze_solver_results.json"
+# =======================================================
+
+trial_results = []
+current_trial = 0
 
 def create_floor(width=4, length=4, height=0.25):
     floor_string = f"""
@@ -24,13 +33,11 @@ def create_floor(width=4, length=4, height=0.25):
       boundingObject Box {{
         size {length} {width} {height}
       }}
-      # No physics node means it's static
     }}
     """
     root = supervisor.getRoot()
     children_field = root.getField("children")
     children_field.importMFNodeFromString(-1, floor_string)
-
 
 def create_wall(x, y, z=0.25, length=1.0, width=0.1, height=0.2):
     wall_string = f"""
@@ -49,71 +56,25 @@ def create_wall(x, y, z=0.25, length=1.0, width=0.1, height=0.2):
       boundingObject Box {{
         size {length} {width} {height}
       }}
-      # No physics node means it's static
     }}
     """
     root = supervisor.getRoot()
     children_field = root.getField("children")
     children_field.importMFNodeFromString(-1, wall_string)
 
-def generate_grid_maze(n=4, side_length=4, wall_cell_ratio=0.1, z_height=0.25, entrance=None, floor_height=0.1):
-    """
-    n: number of cells per side (n x n)
-    cell_size: size of one cell (distance between inner faces of walls)
-    wall_width: thickness of wall strips
-    entrance: tuple (side, index) to leave an opening. side in {'N','S','E','W'},
-              index is cell index along that side (0..n-1)
-    """
-    wall_width = wall_cell_ratio * side_length / n
-    cell_size = (side_length - (n + 1) * wall_width) / n
-
-    create_floor(width=side_length, length=side_length, height=floor_height)
-
-    for col in range(n + 1):
-        for row in range(n):
-            if entrance:
-                side, idx = entrance
-                if side == 'W' and col == 0 and row == idx:
-                    continue
-                if side == 'E' and col == n and row == idx:
-                    continue
-            x = col * (cell_size + wall_width)
-            y = wall_width + row * (cell_size + wall_width)
-            create_wall(x, y, 0, length=wall_width, width=cell_size, height=z_height)
-
-    for row in range(n + 1):
-        for col in range(n):
-            if entrance:
-                side, idx = entrance
-                if side == 'S' and row == 0 and col == idx:
-                    continue
-                if side == 'N' and row == n and col == idx:
-                    continue
-            x = wall_width + col * (cell_size + wall_width)
-            y = row * (cell_size + wall_width)
-            create_wall(x, y, 0, length=cell_size, width=wall_width, height=z_height)
-    for i in range(n + 1):
-        for j in range(n + 1):
-            x = i * (cell_size + wall_width)
-            y = j * (cell_size + wall_width)
-            create_wall(x, y, 0, length=wall_width, width=wall_width, height=z_height)
-
-
-
 class MazeGraph:
     def __init__(self, rows, cols=None, side_length=4, wall_cell_ratio=0.1):
-        
         self.rows = rows
         if cols is None:
             cols = rows
         self.cols = cols
         self.side_length = side_length
         self.wall_cell_ratio = wall_cell_ratio
-        self.side_length = side_length
         self.cells = {
             (x, y): {"N": True, "S": True, "E": True, "W": True}
             for x in range(rows) for y in range(cols)
         }
+        self.epuck_start = None
 
     def in_bounds(self, x, y):
         return 0 <= x < self.rows and 0 <= y < self.cols
@@ -165,13 +126,12 @@ class MazeGraph:
         segments = []
         for (x, y), walls in self.cells.items():
             for side, present in walls.items():
-              if present and (side=="N" or side=="S" and y==0 or side=="E" and x==self.cols-1 or side=="W"):
+                if present and (side=="N" or side=="S" and y==0 or side=="E" and x==self.cols-1 or side=="W"):
                     segments.append((x, y, side))
         return segments
 
     def generate_maze(self, z_height=0.25, floor_height=0.1):
         n = self.rows
-
         create_floor(width=self.side_length, length=self.side_length, height=floor_height)
 
         for (x, y, side) in self.wall_lists():
@@ -186,7 +146,6 @@ class MazeGraph:
                 wy = j * (cell_size + wall_width)
                 create_wall(wx, wy, 0, length=wall_width, width=wall_width, height=z_height)
 
-
     def place_wall_from_cell_side(self, x, y, side, z_height):
         n = self.rows
         wall_width = self.wall_cell_ratio * self.side_length / n
@@ -199,17 +158,14 @@ class MazeGraph:
             wx = wall_width + base_x
             wy = base_y + cell_size + wall_width
             create_wall(wx, wy, 0, length=cell_size, width=wall_width, height=z_height)
-
         elif side == "S":
             wx = wall_width + base_x
             wy = base_y
             create_wall(wx, wy, 0, length=cell_size, width=wall_width, height=z_height)
-
         elif side == "E":
             wx = base_x + cell_size + wall_width
             wy = wall_width + base_y
             create_wall(wx, wy, 0, length=wall_width, width=cell_size, height=z_height)
-
         elif side == "W":
             wx = base_x
             wy = wall_width + base_y
@@ -226,13 +182,13 @@ class MazeGraph:
 
         cx = random.randrange(n)
         cy = random.randrange(m)
-        print(f"Spawning e-puck in cell ({cx},{cy})")
 
         tx = wall_width + cx * (cell_size + wall_width) + cell_size / 2.0
         ty = wall_width + cy * (cell_size + wall_width) + cell_size / 2.0
         tz = 0.0
 
         orientation = random.choice(['E', 'N', 'W', 'S'])
+        self.epuck_start = (cx, cy, {'E': 1, 'N': 0, 'W': 3, 'S': 2}[orientation])
         angle_map = {'E': 0.0, 'N': math.pi / 2.0, 'W': math.pi, 'S': -math.pi / 2.0}
         angle = angle_map[orientation]
 
@@ -241,38 +197,32 @@ class MazeGraph:
           translation {tx} {ty} {tz}
           rotation 0 0 1 {angle}
           name "e_puck_{cx}_{cy}"
-            controller "nav_controllerRemake"
+          controller "nav_controllerRemake"
         }}
         '''
 
         root = supervisor.getRoot()
         children_field = root.getField("children")
         children_field.importMFNodeFromString(-1, epuck_node)
-        print(f"Spawned e-puck at cell ({cx},{cy}) facing {orientation}")
         return (cx, cy, orientation)
     
     def serialize_to_file(self, filepath):
-        """Serialize MazeGraph to a JSON file for nav_controller to read."""
         data = {
             'rows': self.rows,
             'cols': self.cols,
             'side_length': self.side_length,
             'wall_cell_ratio': self.wall_cell_ratio,
-            'cells': {f"{x}_{y}": walls for (x, y), walls in self.cells.items()}
+            'cells': {f"{x}_{y}": walls for (x, y), walls in self.cells.items()},
+            'epuck_start': self.epuck_start
         }
         with open(filepath, 'w') as f:
             json.dump(data, f)
-        print(f"MazeGraph serialized to {filepath}")
-
-
 
 def maze_generator_DFS(maze_graph):
-
     start_cell = (0, 0)
     stack = [start_cell]
     visited = {start_cell}
     
-
     while stack:
         unvisited_neighbors = []
         x, y = stack[-1]
@@ -291,24 +241,121 @@ def maze_generator_DFS(maze_graph):
     maze_graph.carve_exit()
     return maze_graph
 
-
 def maze_hex_size(n, hex_size=1.0, wall_cell_ratio=0.1):
-
     side_length = n * hex_size
     return MazeGraph(n, side_length=side_length, wall_cell_ratio=wall_cell_ratio)
 
-maze_graph = maze_hex_size(5, hex_size=0.09, wall_cell_ratio=0.1)
+def save_results():
+    """Save trial results to JSON."""
+    completed = [t for t in trial_results if t['completed']]
+    
+    stats = {
+        'total_trials': len(trial_results),
+        'completed': len(completed),
+        'failed': len(trial_results) - len(completed),
+        'success_rate': round(len(completed) / len(trial_results) * 100, 1) if trial_results else 0
+    }
+    
+    if completed:
+        steps = [t['steps'] for t in completed]
+        times = [t['time'] for t in completed]
+        stats['steps'] = {'min': min(steps), 'max': max(steps), 'avg': round(sum(steps)/len(steps), 1)}
+        stats['time'] = {'min': round(min(times), 2), 'max': round(max(times), 2), 'avg': round(sum(times)/len(times), 2)}
+    
+    with open(RESULTS_FILE, 'w') as f:
+        json.dump({'statistics': stats, 'trials': trial_results}, f, indent=2)
+    
+    print(f"\n{'='*60}")
+    print(f"RESULTS ({len(trial_results)} trials)")
+    print(f"{'='*60}")
+    print(f"Success: {len(completed)}/{len(trial_results)} ({stats['success_rate']}%)")
+    if completed:
+        print(f"Steps: {stats['steps']['min']}-{stats['steps']['max']} (avg {stats['steps']['avg']})")
+        print(f"Time: {stats['time']['min']}-{stats['time']['max']}s (avg {stats['time']['avg']}s)")
+
+# Initial setup
+print(f"Starting {NUM_TRIALS} trials...")
+maze_graph = maze_hex_size(10, hex_size=0.09, wall_cell_ratio=0.1)
 maze_graph = maze_generator_DFS(maze_graph)
-
-
-
-print("Generating maze on X–Y plane...")
 maze_graph.generate_maze(z_height=0.05, floor_height=0.05)
 maze_graph.spawn_epuck_in_maze()
 
-# Serialize MazeGraph to file for nav_controller
 maze_graph_file = os.path.join(os.path.dirname(__file__), '..', 'nav_controllerRemake', 'maze_graph.json')
 maze_graph.serialize_to_file(maze_graph_file)
 
+trial_start_time = supervisor.getTime()
+
+# Main loop
 while supervisor.step(timeStep) != -1:
-    pass
+    elapsed = supervisor.getTime() - trial_start_time
+    
+    # Check for robot completion signal
+    signal_file = os.path.join(os.path.dirname(__file__), '..', 'nav_controllerRemake', 'trial_complete.json')
+    if os.path.exists(signal_file):
+        try:
+            with open(signal_file, 'r') as f:
+                data = json.load(f)
+            os.remove(signal_file)
+            
+            trial_results.append({
+                'trial': current_trial + 1,
+                'completed': data['completed'],
+                'timeout': False,
+                'time': round(data['time'], 2),
+                'steps': data['steps']
+            })
+            
+            print(f"[Trial {current_trial + 1}] Success={data['completed']}, Steps={data['steps']}, Time={data['time']:.2f}s")
+            save_results()
+            
+            current_trial += 1
+            if current_trial >= NUM_TRIALS:
+                print("\n=== ALL TRIALS COMPLETED ===")
+                break
+            
+            # Reset and start next trial
+            print(f"Starting trial {current_trial + 1}/{NUM_TRIALS}...")
+            supervisor.simulationReset()
+            for _ in range(10):
+                supervisor.step(timeStep)
+            
+            maze_graph = maze_hex_size(10, hex_size=0.09, wall_cell_ratio=0.1)
+            maze_graph = maze_generator_DFS(maze_graph)
+            maze_graph.generate_maze(z_height=0.05, floor_height=0.05)
+            maze_graph.spawn_epuck_in_maze()
+            maze_graph.serialize_to_file(maze_graph_file)
+            
+            trial_start_time = supervisor.getTime()
+        except:
+            pass
+    
+    # Check timeout
+    if elapsed > TRIAL_TIMEOUT:
+        trial_results.append({
+            'trial': current_trial + 1,
+            'completed': False,
+            'timeout': True,
+            'time': TRIAL_TIMEOUT,
+            'steps': -1
+        })
+        
+        print(f"[Trial {current_trial + 1}] TIMEOUT")
+        save_results()
+        
+        current_trial += 1
+        if current_trial >= NUM_TRIALS:
+            print("\n=== ALL TRIALS COMPLETED ===")
+            break
+        
+        print(f"Starting trial {current_trial + 1}/{NUM_TRIALS}...")
+        supervisor.simulationReset()
+        for _ in range(10):
+            supervisor.step(timeStep)
+        
+        maze_graph = maze_hex_size(10, hex_size=0.09, wall_cell_ratio=0.1)
+        maze_graph = maze_generator_DFS(maze_graph)
+        maze_graph.generate_maze(z_height=0.05, floor_height=0.05)
+        maze_graph.spawn_epuck_in_maze()
+        maze_graph.serialize_to_file(maze_graph_file)
+        
+        trial_start_time = supervisor.getTime()

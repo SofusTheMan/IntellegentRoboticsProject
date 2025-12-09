@@ -9,11 +9,35 @@ import json
 import orientation
 import update_possible_positions
 from make_action import make_action
-from next_action import get_next_action
+from next_action import get_next_action, find_exit_cell
+import random
+from collections import Counter
+
+def report_trial_complete(step_count, trial_start_time, success):
+    """
+    Report trial completion to supervisor.
+    Call this once when trial ends (success or failure).
+    """
+    elapsed_time = robot.getTime() - trial_start_time
+    
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    signal_file = os.path.join(script_dir, 'trial_complete.json')
+    
+    data = {
+        'completed': success,
+        'steps': step_count,
+        'time': elapsed_time
+    }
+    
+    with open(signal_file, 'w') as f:
+        json.dump(data, f)
+    
+    print(f"Trial complete: Success={success}, Steps={step_count}, Time={elapsed_time:.2f}s")
+
 
 robot = Robot()
 timestep = int(robot.getBasicTimeStep())
-
+trial_start_time = robot.getTime()
 # Motors
 left_motor = robot.getDevice('left wheel motor')
 right_motor = robot.getDevice('right wheel motor')
@@ -74,42 +98,44 @@ action_start_time = 0
 
 # Thresholds
 OBSTACLE_THRESHOLD = 90
-RIGHT_SENSOR = [1, 2]  # ps2 - right side sensor
-LEFT_SENSOR = [5, 6]  # ps5 - left side sensor
+RIGHT_SENSOR = [2]  # ps2 - right side sensor
+LEFT_SENSOR = [5]  # ps5 - left side sensor
 FRONT_SENSORS = [0, 7]  # ps0 and ps7 - front sensors
 BACK_SENSORS = [3, 4]  # ps4 and ps1 - back sensors
 
 # Initialize possible positions
 possible_positions = []
-for i in range(maze_map.rows):
-    for j in range(maze_map.cols):
-        for direction in [NORTH, EAST, SOUTH, WEST]:
-            possible_positions.append((i, j, direction))
+if maze_map.epuck_start is not None:
+    for i in range(maze_map.rows):
+        for j in range(maze_map.cols):
+            for direction in [NORTH, EAST, SOUTH, WEST]:
+                possible_positions.append((i, j, direction))
+else:
+    possible_positions.append(maze_map.epuck_start)
 
 step_count = 0
 
 def observe_and_filter(sensors, possible_positions, maze_map):
     """Observe walls and filter possible positions."""
     readings = ", ".join(f"ps{i}={sensors[i].getValue():.1f}" for i in range(len(sensors)))
-    print(f"Sensor readings: {readings}")
+    # print(f"Sensor readings: {readings}")
     
     walls_around = orientation.get_walls_around_robot(sensors)
-    print(f"Walls around robot: {walls_around}")
-    print(f"Possible positions before filter: {possible_positions}")
+    # print(f"Walls around robot: {walls_around}")
+    # print(f"Possible positions before filter: {possible_positions}")
     
     filtered = update_possible_positions.update_possible_positions(
         walls_around, possible_positions, maze_map)
     
-    print(f"Possible positions after filter: {filtered}")
-    if len(filtered) <= 5:
-        for pos in filtered:
-            print(f"  Position: row={pos[0]}, col={pos[1]}, dir={pos[2]}")
+    # print(f"Possible positions after filter: {filtered}")
+    # if len(filtered) <= 5:
+    #     for pos in filtered:
+    #         print(f"  Position: row={pos[0]}, col={pos[1]}, dir={pos[2]}")
     
     return filtered
 
 def has_wall_right():
     """Check if there's a wall on the right side."""
-    print("Sensor readings for right wall check:", ", ".join(f"ps{i}={sensors[i].getValue():.1f}" for i in RIGHT_SENSOR))
     return any(sensors[i].getValue() > OBSTACLE_THRESHOLD for i in RIGHT_SENSOR)
 
 def has_obstacle_front():
@@ -123,13 +149,13 @@ def decide_next_action():
         return None  # Exit maze
     
     if not has_wall_right():
-        print("No wall on right - turning right to find wall")
+        # print("No wall on right - turning right to find wall")
         return ACTION_TURN_RIGHT
     elif has_obstacle_front():
-        print("Wall on right + front blocked - turning left")
+        # print("Wall on right + front blocked - turning left")
         return ACTION_TURN_LEFT
     else:
-        print("Wall on right, continuing forward")
+        # print("Wall on right, continuing forward")
         return ACTION_FORWARD
 
 def move_forward_time(distance, speed):
@@ -138,7 +164,7 @@ def move_forward_time(distance, speed):
 
 def turn_90_time():
     """Calculate time needed for 90-degree turn."""
-    return 4.5
+    return 4.448
 
 # Main control loop
 while robot.step(timestep) != -1:
@@ -147,22 +173,30 @@ while robot.step(timestep) != -1:
     if state == STATE_IDLE:
         # We just finished an action (or starting fresh)
         # Decide what to do next
-        print(f"\n=== STEP {step_count} ===")
-        print("State: IDLE - Deciding next action")
+        # print(f"\n=== STEP {step_count} ===")
+        # print("State: IDLE - Deciding next action")
         
         # next_action = decide_next_action()
         actions = []
         for pos in possible_positions:
-            print(f"  Possible position: row={pos[0]}, col={pos[1]}, dir={pos[2]}")
+            # print(f"  Possible position: row={pos[0]}, col={pos[1]}, dir={pos[2]}")
             actions.append(get_next_action(maze_map, pos, True))
-        next_action = max(set(actions), key=actions.count)  # Majority vote
-        
-        if next_action is None:
+        # Choose the majority action but ignore None votes
+        non_none_actions = [a for a in actions if a is not None]
+        if non_none_actions:
+            next_action = random.choice(non_none_actions)
+        else:
+            next_action = None 
+        if len(possible_positions) == 1 and possible_positions[0][0] == find_exit_cell(maze_map)[0] and possible_positions[0][1] == find_exit_cell(maze_map)[1]:
             # Finished maze
             left_motor.setVelocity(0.0)
             right_motor.setVelocity(0.0)
             print(f"Finished maze. Total steps: {step_count}")
+            report_trial_complete(step_count, trial_start_time, True)
             break
+        elif next_action is None:
+            print(possible_positions)
+            print(find_exit_cell(maze_map))
         
         # Start executing the action
         current_action = next_action
@@ -171,15 +205,15 @@ while robot.step(timestep) != -1:
         
         # Start the motors
         if current_action == ACTION_FORWARD:
-            print("Starting: FORWARD")
+            # print("Starting: FORWARD")
             left_motor.setVelocity(forward_speed)
             right_motor.setVelocity(forward_speed)
         elif current_action == ACTION_TURN_RIGHT:
-            print("Starting: TURN RIGHT")
+            # print("Starting: TURN RIGHT")
             left_motor.setVelocity(turn_speed)
             right_motor.setVelocity(-turn_speed)
         elif current_action == ACTION_TURN_LEFT:
-            print("Starting: TURN LEFT")
+            # print("Starting: TURN LEFT")
             left_motor.setVelocity(-turn_speed)
             right_motor.setVelocity(turn_speed)
     
@@ -190,15 +224,15 @@ while robot.step(timestep) != -1:
         if current_action == ACTION_FORWARD:
             if current_time - action_start_time >= move_forward_time(cell_size, forward_speed):
                 action_complete = True
-                print("Completed: FORWARD")
+                # print("Completed: FORWARD")
         elif current_action == ACTION_TURN_RIGHT:
             if current_time - action_start_time >= turn_90_time():
                 action_complete = True
-                print("Completed: TURN RIGHT")
+                # print("Completed: TURN RIGHT")
         elif current_action == ACTION_TURN_LEFT:
             if current_time - action_start_time >= turn_90_time():
                 action_complete = True
-                print("Completed: TURN LEFT")
+                # print("Completed: TURN LEFT")
 
         
         if action_complete:
@@ -209,7 +243,7 @@ while robot.step(timestep) != -1:
             step_count += 1
             
             # Update belief state
-            print(f"Updating belief state after action {current_action}")
+            # print(f"Updating belief state after action {current_action}")
             
             # 1. Apply movement model
             possible_positions = make_action(current_action, possible_positions, maze_map.cols)
@@ -219,6 +253,7 @@ while robot.step(timestep) != -1:
             
             if len(possible_positions) == 0:
                 print("ERROR: No valid positions remaining! Localization failed.")
+                report_trial_complete(step_count, trial_start_time, False)
                 break
             
             # Go back to IDLE to decide next action

@@ -1,737 +1,386 @@
-from controller import Robot
-from motion_primitives import MotionPrimitives
-from sensors import IRSuite
-from wall_perception import WallPerception
-from Localisation import ParticleFilter
-from maze_graph_adapter import load_maze_graph_from_file, NORTH, EAST, SOUTH, WEST
-from planner import Planner
+from controller import Supervisor
+import random
 import math
+import json
+import os
+import time
 
-LEFT_MOTOR = "left wheel motor"
-RIGHT_MOTOR = "right wheel motor"
+supervisor = Supervisor()
+timeStep = int(supervisor.getBasicTimeStep())
 
-# IR threshold for wall detection
-IR_THRESHOLD = 70.0  # Wall detection threshold
+# ==================== CONFIGURATION ====================
+NUM_TRIALS = 50  # Number of maze trials to run
+TRIAL_TIMEOUT = 9000.0  # Maximum time per trial in seconds (5 minutes)
+RESULTS_FILE = "maze_solver_results.json"
+# =======================================================
 
-# Goal: Exit detection (edge cell with no wall = exit)
-# detects exit dynamically by checking edge cells with open walls
-GOAL_ROW = None  # Will be detected
-GOAL_COL = None  # Will be detected
+trial_results = []
+current_trial = 0
 
-robot = Robot()
-dt = int(robot.getBasicTimeStep())
-
-# Load MazeGraph from file (created by maze_generator)
-try:
-    maze_map = load_maze_graph_from_file()
-    MAZE_ROWS = maze_map.rows
-    MAZE_COLS = maze_map.cols
-    MAZE_SIDE_LENGTH = maze_map.side_length
-    WALL_CELL_RATIO = maze_map.wall_cell_ratio
-    print(f"Loaded MazeGraph: {MAZE_ROWS}x{MAZE_COLS}, side_length={MAZE_SIDE_LENGTH}")
-except FileNotFoundError as e:
-    print(f"ERROR: {e}")
-    print("Make sure maze_generator controller runs before nav_controller!")
-    exit(1)
-
-# Calculate actual cell dimensions
-wall_width = WALL_CELL_RATIO * MAZE_SIDE_LENGTH / MAZE_ROWS
-actual_cell_size = (MAZE_SIDE_LENGTH - (MAZE_ROWS + 1) * wall_width) / MAZE_ROWS
-CELL_SIZE_M = actual_cell_size  # Actual cell size after walls
-
-# Motors
-left_motor = robot.getDevice(LEFT_MOTOR)
-right_motor = robot.getDevice(RIGHT_MOTOR)
-mp = MotionPrimitives(robot, left_motor, right_motor)
-
-# Sensors
-irs = IRSuite(robot, noise_sigma=0.0)
-wp = WallPerception(threshold=IR_THRESHOLD)
-
-# Planner (uses maze_map which is now the MazeGraph adapter)
-planner = Planner(rows=MAZE_ROWS, cols=MAZE_COLS)
-# Goal will be set when exit is detected
-
-# Particle Filter (with unknown starting position)
-pf = ParticleFilter(
-    num_particles=200,
-    maze_map=maze_map,
-    cell_size=CELL_SIZE_M,
-    maze_rows=MAZE_ROWS,
-    maze_cols=MAZE_COLS,
-    maze_side_length=MAZE_SIDE_LENGTH
-)
-
-steps = 0
-MAX_STEPS = 10000
-current_path = []
-last_cell = None
-exploration_mode = True  # Start in exploration mode until localized
-goal_detected = False
-moved_at_least_once = False  # Prevent goal check before movement
-
-# Exploration state
-exploration_stack = []  # Stack of cells for backtracking
-last_visited_cell = None
-current_path_cells = []  # Track current path being explored
-path_explored = False  # Flag to track if current path is fully explored
-current_cell_directions_tried = set()  # Track which directions we've tried at current cell
-last_cell_before_turn = None  # Track cell before turning to avoid immediate backtrack
-
-# Loop prevention
-last_action = None
-action_repeat_count = 0
-MAX_ACTION_REPEATS = 3  # If same action repeated 3 times, switch to exploration
-
-
-def world_to_cell(x, y):
-    """Convert world coordinates to cell (row, col)."""
-    cell_c = int((x - wall_width) / (actual_cell_size + wall_width))
-    cell_r = int((y - wall_width) / (actual_cell_size + wall_width))
-    # Clamp to valid range
-    cell_r = max(0, min(MAZE_ROWS - 1, cell_r))
-    cell_c = max(0, min(MAZE_COLS - 1, cell_c))
-    return cell_r, cell_c
-
-
-def cell_to_world(r, c):
-    """Convert cell (row, col) to world coordinates (center of cell)."""
-    x = wall_width + c * (actual_cell_size + wall_width) + actual_cell_size / 2.0
-    y = wall_width + r * (actual_cell_size + wall_width) + actual_cell_size / 2.0
-    return x, y
-
-
-def get_action_to_cell(current_cell, next_cell, current_theta):
+def create_floor(width=4, length=4, height=0.25):
+    floor_string = f"""
+    Solid {{
+      translation {width/2} {length/2} {-height/2}
+      children [
+        Shape {{
+          appearance Appearance {{
+            material Material {{ diffuseColor 0.8 0.8 0.8 }}
+          }}
+          geometry Box {{
+            size {length} {width} {height}
+          }}
+        }}
+      ]
+      boundingObject Box {{
+        size {length} {width} {height}
+      }}
+    }}
     """
-    Determine action needed to move from current_cell to next_cell.
-    Returns: ('forward', 0) or ('turn', angle_deg)
+    root = supervisor.getRoot()
+    children_field = root.getField("children")
+    children_field.importMFNodeFromString(-1, floor_string)
+
+def create_wall(x, y, z=0.25, length=1.0, width=0.1, height=0.2):
+    wall_string = f"""
+    Solid {{
+      translation {x+length/2} {y + width/2} {z+height/2}
+      children [
+        Shape {{
+          appearance Appearance {{
+            material Material {{ diffuseColor 0.2 0.2 0.2 }}
+          }}
+          geometry Box {{
+            size {length} {width} {height}
+          }}
+        }}
+      ]
+      boundingObject Box {{
+        size {length} {width} {height}
+      }}
+    }}
     """
-    dr = next_cell[0] - current_cell[0]
-    dc = next_cell[1] - current_cell[1]
-    
-    # Determine required orientation
-    if dr == -1 and dc == 0:  # North
-        required_theta = math.pi / 2
-    elif dr == 1 and dc == 0:  # South
-        required_theta = -math.pi / 2
-    elif dr == 0 and dc == 1:  # East
-        required_theta = 0.0
-    elif dr == 0 and dc == -1:  # West
-        required_theta = math.pi
-    else:
-        return None
-    
-    # Normalize current theta to [0, 2π) for easier comparison
-    current_theta_norm = current_theta % (2 * math.pi)
-    # Normalize required theta to [0, 2π)
-    if required_theta < 0:
-        required_theta_norm = required_theta + 2 * math.pi
-    else:
-        required_theta_norm = required_theta
-    
-    # Calculate angle difference (shortest path)
-    angle_diff = required_theta_norm - current_theta_norm
-    if angle_diff > math.pi:
-        angle_diff -= 2 * math.pi
-    elif angle_diff < -math.pi:
-        angle_diff += 2 * math.pi
-    
-    angle_diff_deg = math.degrees(angle_diff)
-    
+    root = supervisor.getRoot()
+    children_field = root.getField("children")
+    children_field.importMFNodeFromString(-1, wall_string)
 
-    # This prevents unnecessary turns when robot is already facing roughly the right way
-    if abs(angle_diff_deg) < 45:  # threshold (45 degrees)
-        return ('forward', 0)
-    else:
-        # Normalize large turns to 90-degree increments to prevent oscillation
-        if abs(angle_diff_deg) > 90:
-            # Break into 90-degree steps
-            if angle_diff_deg > 0:
-                return ('turn', 90)
-            else:
-                return ('turn', -90)
+class MazeGraph:
+    def __init__(self, rows, cols=None, side_length=4, wall_cell_ratio=0.1):
+        self.rows = rows
+        if cols is None:
+            cols = rows
+        self.cols = cols
+        self.side_length = side_length
+        self.wall_cell_ratio = wall_cell_ratio
+        self.cells = {
+            (x, y): {"N": True, "S": True, "E": True, "W": True}
+            for x in range(rows) for y in range(cols)
+        }
+        self.epuck_start = None
+
+    def in_bounds(self, x, y):
+        return 0 <= x < self.rows and 0 <= y < self.cols
+
+    def neighbors(self, x, y):
+        deltas = [(0, 1, "N"), (0, -1, "S"), (1, 0, "E"), (-1, 0, "W")]
+        result = []
+        for dx, dy, d in deltas:
+            nx, ny = x + dx, y + dy
+            if self.in_bounds(nx, ny):
+                result.append((nx, ny, d))
+        return result
+
+    def remove_wall_between(self, a, b):
+        (x1, y1), (x2, y2) = a, b
+        dx, dy = x2 - x1, y2 - y1
+        if (dx, dy) == (0, 1):
+            self.cells[(x1, y1)]["N"] = False
+            self.cells[(x2, y2)]["S"] = False
+        elif (dx, dy) == (0, -1):
+            self.cells[(x1, y1)]["S"] = False
+            self.cells[(x2, y2)]["N"] = False
+        elif (dx, dy) == (1, 0):
+            self.cells[(x1, y1)]["E"] = False
+            self.cells[(x2, y2)]["W"] = False
+        elif (dx, dy) == (-1, 0):
+            self.cells[(x1, y1)]["W"] = False
+            self.cells[(x2, y2)]["E"] = False
+
+    def carve_exit(self):
+        side = random.choice(["N", "S", "E", "W"])
+        if side in ["N", "S"]:
+            idx = random.randint(0, self.cols - 1)
         else:
-            return ('turn', angle_diff_deg)
+            idx = random.randint(0, self.rows - 1)
+        self.carve_entrance(side, idx)
 
+    def carve_entrance(self, side, index):
+        if side == "N":
+            self.cells[(index, self.cols - 1)]["N"] = False
+        elif side == "S":
+            self.cells[(index, 0)]["S"] = False
+        elif side == "E":
+            self.cells[(self.rows - 1, index)]["E"] = False
+        elif side == "W":
+            self.cells[(0, index)]["W"] = False
 
-def check_wall_during_movement():
-    """Check if wall is detected during movement - used as callback during forward motion."""
-    ir_current = irs.read()
-    walls_current = wp.classify(ir_current)
+    def wall_lists(self):
+        segments = []
+        for (x, y), walls in self.cells.items():
+            for side, present in walls.items():
+                if present and (side=="N" or side=="S" and y==0 or side=="E" and x==self.cols-1 or side=="W"):
+                    segments.append((x, y, side))
+        return segments
+
+    def generate_maze(self, z_height=0.25, floor_height=0.1):
+        n = self.rows
+        create_floor(width=self.side_length, length=self.side_length, height=floor_height)
+
+        for (x, y, side) in self.wall_lists():
+            self.place_wall_from_cell_side(x, y, side, z_height)
+
+        wall_width = self.wall_cell_ratio * self.side_length / n
+        cell_size  = (self.side_length - (n + 1) * wall_width) / n
+
+        for i in range(n + 1):
+            for j in range(n + 1):
+                wx = i * (cell_size + wall_width)
+                wy = j * (cell_size + wall_width)
+                create_wall(wx, wy, 0, length=wall_width, width=wall_width, height=z_height)
+
+    def place_wall_from_cell_side(self, x, y, side, z_height):
+        n = self.rows
+        wall_width = self.wall_cell_ratio * self.side_length / n
+        cell_size  = (self.side_length - (n + 1) * wall_width) / n
+
+        base_x = x * (cell_size + wall_width)
+        base_y = y * (cell_size + wall_width)
+
+        if side == "N":
+            wx = wall_width + base_x
+            wy = base_y + cell_size + wall_width
+            create_wall(wx, wy, 0, length=cell_size, width=wall_width, height=z_height)
+        elif side == "S":
+            wx = wall_width + base_x
+            wy = base_y
+            create_wall(wx, wy, 0, length=cell_size, width=wall_width, height=z_height)
+        elif side == "E":
+            wx = base_x + cell_size + wall_width
+            wy = wall_width + base_y
+            create_wall(wx, wy, 0, length=wall_width, width=cell_size, height=z_height)
+        elif side == "W":
+            wx = base_x
+            wy = wall_width + base_y
+            create_wall(wx, wy, 0, length=wall_width, width=cell_size, height=z_height)
+
+    def spawn_epuck_in_maze(self):
+        n = self.rows
+        m = self.cols
+
+        side_length = self.side_length
+        wall_cell_ratio = self.wall_cell_ratio
+        wall_width = wall_cell_ratio * side_length / n
+        cell_size = (side_length - (n + 1) * wall_width) / n
+
+        cx = random.randrange(n)
+        cy = random.randrange(m)
+
+        tx = wall_width + cx * (cell_size + wall_width) + cell_size / 2.0
+        ty = wall_width + cy * (cell_size + wall_width) + cell_size / 2.0
+        tz = 0.0
+
+        orientation = random.choice(['E', 'N', 'W', 'S'])
+        self.epuck_start = (cx, cy, {'E': 1, 'N': 0, 'W': 3, 'S': 2}[orientation])
+        angle_map = {'E': 0.0, 'N': math.pi / 2.0, 'W': math.pi, 'S': -math.pi / 2.0}
+        angle = angle_map[orientation]
+
+        epuck_node = f'''
+        E-puck {{
+          translation {tx} {ty} {tz}
+          rotation 0 0 1 {angle}
+          name "e_puck_{cx}_{cy}"
+          controller "nav_controllerRemake"
+        }}
+        '''
+
+        root = supervisor.getRoot()
+        children_field = root.getField("children")
+        children_field.importMFNodeFromString(-1, epuck_node)
+        print(f"Spawned e-puck at cell ({cx},{cy}) facing {orientation}")
+        return (cx, cy, orientation)
     
-    # Stop only if a wall is detected directly in front.
-    # relys on the classification threshold (IR_THRESHOLD) and avoid extra raw checks
-    # so the robot stays flexible in narrow corridors.
-    return walls_current.front
+    def serialize_to_file(self, filepath):
+        """Serialize MazeGraph to a JSON file for nav_controller to read."""
+        data = {
+            'rows': self.rows,
+            'cols': self.cols,
+            'side_length': self.side_length,
+            'wall_cell_ratio': self.wall_cell_ratio,
+            'cells': {f"{x}_{y}": walls for (x, y), walls in self.cells.items()},
+            'epuck_start': self.epuck_start
+        }
+        with open(filepath, 'w') as f:
+            json.dump(data, f)
 
+def maze_generator_DFS(maze_graph):
+    start_cell = (0, 0)
+    stack = [start_cell]
+    visited = {start_cell}
+    
+    while stack:
+        unvisited_neighbors = []
+        x, y = stack[-1]
+        for nx, ny, _ in maze_graph.neighbors(x, y):
+            if (nx, ny) not in visited:
+                unvisited_neighbors.append((nx, ny))
 
-def execute_action(action, walls, ir_readings=None):
-    
-    action_type, value = action
-    
-    if action_type == 'forward':
-        # Always rechecks sensors before moving forward
-        if ir_readings is not None:
-            # Reread sensors to ensure no wall (use same threshold as wall detection)
-            current_walls = wp.classify(ir_readings)
-            if current_walls.front:
-                print("  [SAFETY] Front blocked (sensor check), cannot move forward")
-                return False
-        
-        # Double-check with provided walls
-        if walls.front:
-            print("  [SAFETY] Front blocked, cannot move forward")
-            return False
-        
-        # Move forward with continuous sensor monitoring
-        success = mp.forward_cells(1, CELL_SIZE_M, 
-                                   check_sensors=check_wall_during_movement,
-                                   stop_on_wall=True)
-        
-        if success:
-            pf.predict(forward_dist=CELL_SIZE_M, turn_angle=0.0,
-                       sigma_fwd=0.01, sigma_turn=0.02)
-            return True
+        if len(unvisited_neighbors) > 0:
+            next_cell = random.choice(unvisited_neighbors)
+            maze_graph.remove_wall_between((x, y), next_cell)
+            visited.add(next_cell)
+            stack.append(next_cell)
         else:
-            print("  [SAFETY] Movement stopped due to wall detection")
-            return False
-    elif action_type == 'turn':
-        turn_angle_rad = math.radians(value)
-        # Use optimized 90-degree turns when possible
-        if abs(value - 90) < 10:
-            mp.turn_90_left()
-        elif abs(value + 90) < 10:
-            mp.turn_90_right()
-        elif abs(abs(value) - 180) < 10:
-            # 180 degree turn
-            mp.turn_90_right()
-            mp.turn_90_right()
-        else:
-            # Arbitrary angle
-            mp.turn_deg(value)
-        
-        pf.predict(forward_dist=0.0, turn_angle=turn_angle_rad,
-                   sigma_fwd=0.0, sigma_turn=0.02)
-        return True
-    
-    return False
+            stack.pop()
 
+    maze_graph.carve_exit()
+    return maze_graph
 
-def is_localized():
-    """Check if particle filter has converged (low uncertainty)."""
-    # Calculate spread of particles
-    particles_x = [p[0] for p in pf.particles]
-    particles_y = [p[1] for p in pf.particles]
-    
-    if len(particles_x) == 0:
-        return False
-    
-    x_std = math.sqrt(sum((x - sum(particles_x)/len(particles_x))**2 for x in particles_x) / len(particles_x))
-    y_std = math.sqrt(sum((y - sum(particles_y)/len(particles_y))**2 for y in particles_y) / len(particles_y))
-    
-    # Consider localized if std dev is less than one cell
-    return x_std < actual_cell_size * 0.5 and y_std < actual_cell_size * 0.5
+def maze_hex_size(n, hex_size=1.0, wall_cell_ratio=0.1):
+    side_length = n * hex_size
+    return MazeGraph(n, side_length=side_length, wall_cell_ratio=wall_cell_ratio)
 
+def save_trial_results():
+    """Save all trial results to JSON file."""
+    with open(RESULTS_FILE, 'w') as f:
+        json.dump({
+            'num_trials': len(trial_results),
+            'trials': trial_results
+        }, f, indent=2)
+    print(f"\n=== Results saved to {RESULTS_FILE} ===")
 
-def detect_exit(cell_r, cell_c, walls, orientation, ir_readings=None):
-    """
-    Detect exit: edge cell with NO WALL = exit.
-    Simple logic: if at edge AND no wall in front = exit.
-    Returns (exit_row, exit_col) if exit found, None otherwise.
-    """
-    # Check if we're at an edge cell
-    is_north_edge = (cell_r == 0)
-    is_south_edge = (cell_r == MAZE_ROWS - 1)
-    is_east_edge = (cell_c == MAZE_COLS - 1)
-    is_west_edge = (cell_c == 0)
+def print_statistics():
+    """Print summary statistics of all trials."""
+    if not trial_results:
+        return
     
-    if not (is_north_edge or is_south_edge or is_east_edge or is_west_edge):
-        return None
+    completed = [t for t in trial_results if t['completed']]
+    failed = [t for t in trial_results if not t['completed']]
     
-    # First, check the internal map (if we have information) to see if this edge is open.
-    if maze_map.in_bounds(cell_r, cell_c):
-        cell = maze_map.get_cell(cell_r, cell_c)
-        if is_north_edge and not cell.wallN:
-            return (cell_r, cell_c)
-        if is_south_edge and not cell.wallS:
-            return (cell_r, cell_c)
-        if is_east_edge and not cell.wallE:
-            return (cell_r, cell_c)
-        if is_west_edge and not cell.wallW:
-            return (cell_r, cell_c)
+    print("\n" + "="*60)
+    print(f"FINAL STATISTICS ({len(trial_results)} trials)")
+    print("="*60)
+    print(f"Completed: {len(completed)} ({len(completed)/len(trial_results)*100:.1f}%)")
+    print(f"Failed: {len(failed)} ({len(failed)/len(trial_results)*100:.1f}%)")
     
-    # As a fallback, rely on sensors: if at edge and no wall detected ahead, treat as exit.
-    if not walls.front:
-        if ir_readings is not None:
-            front_sensors = [ir_readings[0], ir_readings[7]]
-            max_front = max(front_sensors)
-            if max_front < IR_THRESHOLD * 0.7:  # more tolerant threshold for open space
-                return (cell_r, cell_c)
-        else:
-            return (cell_r, cell_c)
-    
-    return None
+    if completed:
+        steps = [t['steps'] for t in completed]
+        times = [t['time'] for t in completed]
+        print(f"\nSteps - Min: {min(steps)}, Max: {max(steps)}, Avg: {sum(steps)/len(steps):.1f}")
+        print(f"Time - Min: {min(times):.1f}s, Max: {max(times):.1f}s, Avg: {sum(times)/len(times):.1f}s")
 
+# Initial setup
+print(f"Starting {NUM_TRIALS} maze trials...")
+maze_graph = maze_hex_size(10, hex_size=0.09, wall_cell_ratio=0.1)
+maze_graph = maze_generator_DFS(maze_graph)
+maze_graph.generate_maze(z_height=0.05, floor_height=0.05)
+maze_graph.spawn_epuck_in_maze()
 
-# Main control loop
-print("=" * 60)
-print("Simultaneous Maze Navigation and Localization Robot")
-print("=" * 60)
-print(f"Maze: {MAZE_ROWS}x{MAZE_COLS}, Goal: Exit (to be detected)")
-print(f"Particles: {pf.num_particles}, Unknown starting position")
-print("=" * 60)
+maze_graph_file = os.path.join(os.path.dirname(__file__), '..', 'nav_controllerRemake', 'maze_graph.json')
+maze_graph.serialize_to_file(maze_graph_file)
 
-while robot.step(dt) != -1 and steps < MAX_STEPS:
-    ir = irs.read()
-    walls = wp.classify(ir)
+trial_start_time = supervisor.getTime()
+
+# Main loop
+while supervisor.step(timeStep) != -1:
+    current_time = supervisor.getTime()
+    elapsed = current_time - trial_start_time
     
-    # Get estimated pose from particle filter
-    est_x, est_y, est_theta = pf.estimate_pose()
-    current_cell = world_to_cell(est_x, est_y)
-    print(f"\n[STEP {steps}] Pose Estimate: ({est_x:.3f}, {est_y:.3f}, {math.degrees(est_theta):.1f}°), Cell: {current_cell}")
-    # Mark current cell as visited (no mapping - we use the known map from maze_generator)
-    maze_map.mark_visited(current_cell[0], current_cell[1])
-    
-    # Update particle filter with sensor data
-    pf.update(ir, walls)
-    pf.resample()
-    
-    # Re-estimate pose after update
-    est_x, est_y, est_theta = pf.estimate_pose()
-    current_cell = world_to_cell(est_x, est_y)
-    
-    # Track if we moved this step
-    action_executed_this_step = False
-    
-    
-    exit_cell = detect_exit(current_cell[0], current_cell[1], walls, est_theta, ir)
-    
-    # Detect exit (goal) if not already detected
-    if not goal_detected and moved_at_least_once:
-        if exit_cell and exit_cell == current_cell:
-            GOAL_ROW, GOAL_COL = exit_cell
-            planner.set_goal_cells([(GOAL_ROW, GOAL_COL)])
-            goal_detected = True
-            print(f"\n[EXIT DETECTED] Goal set to cell ({GOAL_ROW}, {GOAL_COL})")
-            print(f"  Robot at edge cell, sensors confirm no wall = EXIT!")
-    
-    # Check if it has reached the exit - (every step, BEFORE and AFTER movement)
-    if moved_at_least_once:
-        # Check if at exit cell with no wall 
-        is_at_exit = False
-        front_sensors = [ir[0], ir[7]]
-        max_front = max(front_sensors)
-        
-        # Check if it is at an edge cell
-        is_north_edge = (current_cell[0] == 0)
-        is_south_edge = (current_cell[0] == MAZE_ROWS - 1)
-        is_east_edge = (current_cell[1] == MAZE_COLS - 1)
-        is_west_edge = (current_cell[1] == 0)
-        is_at_edge = is_north_edge or is_south_edge or is_east_edge or is_west_edge
-        
-        
-        if is_at_edge and not walls.front and max_front < IR_THRESHOLD * 0.4:
-            is_at_exit = True
-            # Set goal if not already set
-            if not goal_detected:
-                GOAL_ROW, GOAL_COL = current_cell
-                goal_detected = True
-                planner.set_goal_cells([(GOAL_ROW, GOAL_COL)])
-                print(f"\n[EXIT DETECTED] Goal set to cell ({GOAL_ROW}, {GOAL_COL})")
-        
-        
-        if goal_detected:
+    # Check for completion signal from robot
+    completion_file = os.path.join(os.path.dirname(__file__), '..', 'nav_controllerRemake', 'trial_complete.json')
+    if os.path.exists(completion_file):
+        try:
+            with open(completion_file, 'r') as f:
+                data = json.load(f)
             
-            if current_cell == (GOAL_ROW, GOAL_COL):
-                
-                if not walls.front:
-                    is_at_exit = True
-                
-                elif max_front < IR_THRESHOLD * 0.5:
-                    is_at_exit = True
+            print(f"\n[Trial {current_trial + 1}] COMPLETED - Steps: {data['steps']}, Time: {data['time']:.1f}s, Success: {data['completed']}")
+            trial_results.append({
+                'trial': current_trial + 1,
+                'completed': data['completed'],
+                'timeout': False,
+                'time': data['time'],
+                'steps': data['steps']
+            })
             
+            # Delete file BEFORE incrementing trial or resetting
+            try:
+                os.remove(completion_file)
+            except:
+                pass
             
-            dr = GOAL_ROW - current_cell[0]  
-            dc = GOAL_COL - current_cell[1]  
-            if abs(dr) + abs(dc) == 1:  
-                
-                theta_norm = est_theta % (2 * math.pi)
-                facing_goal = False
-                
-                # Check if orientation matches direction TO goal
-                if dr == 1 and abs(theta_norm - math.pi/2) < 0.5:  
-                    facing_goal = True
-                elif dr == -1 and (abs(theta_norm + math.pi/2) < 0.5 or abs(theta_norm - 3*math.pi/2) < 0.5):  
-                    facing_goal = True
-                elif dc == 1 and (abs(theta_norm) < 0.5 or abs(theta_norm - 2*math.pi) < 0.5):  
-                    facing_goal = True
-                elif dc == -1 and abs(theta_norm - math.pi) < 0.5:  
-                    facing_goal = True
-                
-                if facing_goal and not walls.front and max_front < IR_THRESHOLD * 0.4:
-                    is_at_exit = True
+            # Save intermediate results after each trial
+            save_trial_results()
+            
+            current_trial += 1
+            
+            if current_trial >= NUM_TRIALS:
+                print("\n=== ALL TRIALS COMPLETED ===")
+                print_statistics()
+                break
+            
+            # Reset for next trial
+            print(f"\nResetting for trial {current_trial + 1}/{NUM_TRIALS}...")
+            supervisor.simulationReset()
+            
+            # Wait a bit after reset
+            for _ in range(10):
+                supervisor.step(timeStep)
+            
+            # Regenerate maze
+            maze_graph = maze_hex_size(10, hex_size=0.09, wall_cell_ratio=0.1)
+            maze_graph = maze_generator_DFS(maze_graph)
+            maze_graph.generate_maze(z_height=0.05, floor_height=0.05)
+            maze_graph.spawn_epuck_in_maze()
+            maze_graph.serialize_to_file(maze_graph_file)
+            
+            trial_start_time = supervisor.getTime()
+            continue
+        except Exception as e:
+            print(f"Error reading completion file: {e}")
+            pass
+    
+    # Check for timeout
+    if elapsed > TRIAL_TIMEOUT:
+        print(f"\n[Trial {current_trial + 1}] TIMEOUT after {elapsed:.1f}s")
+        trial_results.append({
+            'trial': current_trial + 1,
+            'completed': False,
+            'timeout': True,
+            'time': elapsed,
+            'steps': -1
+        })
         
-        # checks if at edge with no wall (even if goal not detected yet)
-        if exit_cell and exit_cell == current_cell:
-            if not walls.front and max_front < IR_THRESHOLD * 0.4:
-                is_at_exit = True
-                # Set goal if not already set
-                if not goal_detected:
-                    GOAL_ROW, GOAL_COL = exit_cell
-                    goal_detected = True
-                    planner.set_goal_cells([(GOAL_ROW, GOAL_COL)])
+        # Save intermediate results
+        save_trial_results()
         
-        # If at goal cell and goal is detected, prioritize exit check
-        if goal_detected and current_cell == (GOAL_ROW, GOAL_COL):
-            # If sensors show no wall, we're done!
-            if not walls.front or max_front < IR_THRESHOLD * 0.6:
-                is_at_exit = True
+        current_trial += 1
         
-        if is_at_exit:
-            # STOP IMMEDIATELY - Exit reached!
-            mp.stop()
-            print(f"\n{'='*60}")
-            print(f"✓ GOAL REACHED at step {steps}!")
-            print(f"Final pose: ({est_x:.3f}, {est_y:.3f}, {math.degrees(est_theta):.1f}°)")
-            print(f"Final cell: {current_cell}")
-            if goal_detected:
-                print(f"Goal cell: ({GOAL_ROW}, {GOAL_COL})")
-            print(f"Front sensors: {front_sensors[0]:.1f}, {front_sensors[1]:.1f} (no wall = exit!)")
-            print(f"At edge: {is_at_edge}, No wall: {not walls.front}")
-            print(f"{'='*60}")
+        if current_trial >= NUM_TRIALS:
+            print("\n=== ALL TRIALS COMPLETED ===")
+            print_statistics()
             break
-    
-    # Decision making, so it chooses action with highest probability of success
-    # Use Dijkstra path planning if we have a good estimate, otherwise explore
-    
-    localized = is_localized()
-    
-    # If already at goal, don't try to plan - just check if we should declare success
-    if goal_detected and current_cell == (GOAL_ROW, GOAL_COL):
-        # it is at the goal cell, so sensors check one more time
-        front_sensors_check = [ir[0], ir[7]]
-        max_front_check = max(front_sensors_check)
-        walls_check = wp.classify(ir)
         
-        if not walls_check.front or max_front_check < IR_THRESHOLD * 0.6:
-            # it s at goal and sensors confirm no wall = EXIT REACHED!
-            mp.stop()
-            print(f"\n{'='*60}")
-            print(f"✓ GOAL REACHED at step {steps}!")
-            print(f"Final pose: ({est_x:.3f}, {est_y:.3f}, {math.degrees(est_theta):.1f}°)")
-            print(f"Final cell: {current_cell}")
-            print(f"Goal cell: ({GOAL_ROW}, {GOAL_COL})")
-            print(f"Front sensors: {front_sensors_check[0]:.1f}, {front_sensors_check[1]:.1f} (no wall = exit!)")
-            print(f"{'='*60}")
-            break
-    
-    # Only used path planning if goal is detected AND we're not already at goal
-    if goal_detected and (localized or steps > 50) and current_cell != (GOAL_ROW, GOAL_COL):  # Use path planning after some exploration
-        exploration_mode = False
+        # Reset simulation
+        print(f"\nResetting for trial {current_trial + 1}/{NUM_TRIALS}...")
+        supervisor.simulationReset()
         
-        # Plan path using Dijkstra
-        planner.flood_fill(maze_map)  
-        path = planner.dijkstra(maze_map, current_cell, (GOAL_ROW, GOAL_COL))
+        # Wait a bit after reset
+        for _ in range(10):
+            supervisor.step(timeStep)
         
-        if path and len(path) > 1:
-            current_path = path
-            next_cell = path[1]  # Nextcell in pathh
-            
-            
-            if next_cell == (GOAL_ROW, GOAL_COL) or current_cell == (GOAL_ROW, GOAL_COL):
-                # it's at or moving to exit - checks if should stop
-                front_sensors = [ir[0], ir[7]]
-                max_front = max(front_sensors)
-                # alot of lenient threshold  - exit should have very low readings
-                if not walls.front and max_front < IR_THRESHOLD * 0.4:
-                    # At exit - SHOULDSTOP!
-                    mp.stop()
-                    print(f"\n{'='*60}")
-                    print(f"✓ EXIT REACHED at step {steps}!")
-                    print(f"Final pose: ({est_x:.3f}, {est_y:.3f}, {math.degrees(est_theta):.1f}°)")
-                    print(f"Final cell: {current_cell}")
-                    print(f"Goal cell: ({GOAL_ROW}, {GOAL_COL})")
-                    print(f"Front sensors: {front_sensors[0]:.1f}, {front_sensors[1]:.1f} (no wall = exit!)")
-                    print(f"{'='*60}")
-                    break
-            
-           
-            if next_cell != current_cell:
-                action = get_action_to_cell(current_cell, next_cell, est_theta)
-                
-                if action:
-                    # LOOP PREVENTION: Check if we're repeating the same action
-                    if action == last_action:
-                        action_repeat_count += 1
-                        if action_repeat_count >= MAX_ACTION_REPEATS:
-                            # Stuck in loop - switch to exploration
-                            print(f"  [WARN] Stuck in loop, switching to exploration...")
-                            action_executed_this_step = False
-                            exploration_mode = True
-                        else:
-                            # Still trying same action, but not too many times yet
-                            pass
-                    else:
-                        # New action - reset counter
-                        action_repeat_count = 0
-                        last_action = action
-                    
-                    # Only execute if not stuck in loop
-                    if action_repeat_count < MAX_ACTION_REPEATS:
-                        # If action is forward and no wall, execute it
-                        # Don't let path planning override basic wall detection
-                        if action[0] == 'forward':
-                            # Check if there's actually a wall before moving
-                            if not walls.front:
-                                if steps % 5 == 0:  # Print less frequently
-                                    print(f"\n[STEP {steps}] Localized: {localized}, Navigating to exit")
-                                    print(f"  Pose: ({est_x:.3f}, {est_y:.3f}, {math.degrees(est_theta):.1f}°)")
-                                    print(f"  Cell: {current_cell}, Goal: ({GOAL_ROW}, {GOAL_COL})")
-                                    print(f"  Path length: {len(path)}, Next: {next_cell}")
-                                    print(f"  Action: forward")
-                                
-                                if execute_action(action, walls, ir):
-                                    moved_at_least_once = True
-                                    action_executed_this_step = True
-                            else:
-                                # Wall detected, fall back to exploration
-                                print(f"  [WARN] Wall detected, switching to exploration...")
-                                action_executed_this_step = False  # Let exploration handle it
-                        else:
-                            # check if it should go forward instead
-                            # If no wall in front, prefer forward over turning
-                            if not walls.front:
-                                # No wall goes forward instead of turning
-                                if steps % 5 == 0:
-                                    print(f"\n[STEP {steps}] No wall in front, going forward instead of turning")
-                                if execute_action(('forward', 0), walls, ir):
-                                    moved_at_least_once = True
-                                    action_executed_this_step = True
-                                    last_action = ('forward', 0)  
-                            else:
-                                # Wall in front, turn is necessary
-                                if steps % 5 == 0:  # Print less frequently
-                                    print(f"\n[STEP {steps}] Localized: {localized}, Navigating to exit")
-                                    print(f"  Pose: ({est_x:.3f}, {est_y:.3f}, {math.degrees(est_theta):.1f}°)")
-                                    print(f"  Cell: {current_cell}, Goal: ({GOAL_ROW}, {GOAL_COL})")
-                                    print(f"  Path length: {len(path)}, Next: {next_cell}")
-                                    print(f"  Action: {action[0]} {action[1] if action[0]=='turn' else ''}")
-                                
-                                if execute_action(action, walls, ir):
-                                    moved_at_least_once = True
-                                    action_executed_this_step = True
-                                
-                                # ckeck again after movement - might have passed through exit
-                                # recheck sensors after movement
-                                ir_after = irs.read()
-                                walls_after = wp.classify(ir_after)
-                                front_sensors_after = [ir_after[0], ir_after[7]]
-                                max_front_after = max(front_sensors_after)
-                                
-                                # check if we're at an edge cell after movement
-                                is_at_edge_after = (
-                                    current_cell[0] == 0 or current_cell[0] == MAZE_ROWS - 1 or
-                                    current_cell[1] == 0 or current_cell[1] == MAZE_COLS - 1
-                                )
-                                
-                                # f at edge with no wall = exit
-                                if is_at_edge_after and not walls_after.front and max_front_after < IR_THRESHOLD * 0.4:
-                                    # Just passed through exit - stop
-                                    mp.stop()
-                                    print(f"\n{'='*60}")
-                                    print(f"✓ EXIT REACHED at step {steps}!")
-                                    print(f"Final pose: ({est_x:.3f}, {est_y:.3f}, {math.degrees(est_theta):.1f}°)")
-                                    print(f"Final cell: {current_cell}")
-                                    if goal_detected:
-                                        print(f"Goal cell: ({GOAL_ROW}, {GOAL_COL})")
-                                    print(f"Front sensors: {front_sensors_after[0]:.1f}, {front_sensors_after[1]:.1f} (no wall = exit!)")
-                                    print(f"{'='*60}")
-                                    break
-            else:
-                # path planning failed, fall back to exploration
-                # doent print warning every step to reduce spam
-                if steps % 10 == 0:
-                    print(f"  [WARN] Path planning issue, using exploration...")
-                
-                action_executed_this_step = False
-        else:
-            # No path found - check if we're already at goal before warning
-            if goal_detected and current_cell == (GOAL_ROW, GOAL_COL):
-                # it's at goal check sensors and declare success
-                front_sensors_check = [ir[0], ir[7]]
-                max_front_check = max(front_sensors_check)
-                walls_check = wp.classify(ir)
-                
-                if not walls_check.front or max_front_check < IR_THRESHOLD * 0.6:
-                    # it's at goal and sensors confirm no wall = EXIT REACHED
-                    mp.stop()
-                    print(f"\n{'='*60}")
-                    print(f"✓ GOAL REACHED at step {steps}!")
-                    print(f"Final pose: ({est_x:.3f}, {est_y:.3f}, {math.degrees(est_theta):.1f}°)")
-                    print(f"Final cell: {current_cell}")
-                    print(f"Goal cell: ({GOAL_ROW}, {GOAL_COL})")
-                    print(f"Front sensors: {front_sensors_check[0]:.1f}, {front_sensors_check[1]:.1f} (no wall = exit!)")
-                    print(f"{'='*60}")
-                    break
-            else:
-                # No path found - use exploration mode
-                # doesn't print warning every step
-                if steps % 10 == 0:
-                    print(f"  [WARN] No path to goal, exploring...")
-                # let exploration mode handle it (will be handled below)
-                action_executed_this_step = False
-    else:
-        # Systematic path exploration with backtracking
-        exploration_mode = True
-        if steps % 20 == 0:  # Print less frequently during exploration
-            print(f"\n[STEP {steps}] Exploring (localizing...)")
-            print(f"  Estimated cell: {current_cell}, Pose: ({est_x:.3f}, {est_y:.3f})")
+        # Regenerate maze
+        maze_graph = maze_hex_size(10, hex_size=0.09, wall_cell_ratio=0.1)
+        maze_graph = maze_generator_DFS(maze_graph)
+        maze_graph.generate_maze(z_height=0.05, floor_height=0.05)
+        maze_graph.spawn_epuck_in_maze()
+        maze_graph.serialize_to_file(maze_graph_file)
         
-        # Track visited cells for backtracking
-        if last_visited_cell != current_cell:
-            # New cell visited - add to current path and exploration stack
-            if last_visited_cell is not None:
-                if last_visited_cell not in exploration_stack:
-                    exploration_stack.append(last_visited_cell)
-                current_path_cells.append(last_visited_cell)
-            last_visited_cell = current_cell
-        
-        # Check for exit first (before any movement)
-        exit_cell = detect_exit(current_cell[0], current_cell[1], walls, est_theta, ir)
-        if exit_cell and not goal_detected:
-            GOAL_ROW, GOAL_COL = exit_cell
-            planner.set_goal_cells([(GOAL_ROW, GOAL_COL)])
-            goal_detected = True
-            print(f"\n[EXIT DETECTED] Goal set to cell ({GOAL_ROW}, {GOAL_COL})")
-            print(f"  Robot at edge cell, sensors confirm no wall = EXIT!")
-        
-        # Reset directions tried if we moved to a new cell
-        if last_visited_cell != current_cell:
-            current_cell_directions_tried = set()
-            last_cell_before_turn = None
-        
-        # Determine forward cell and current direction
-        forward_cell = None
-        theta_norm = est_theta % (2 * math.pi)
-        current_direction = None
-        if abs(theta_norm) < 0.2 or abs(theta_norm - 2 * math.pi) < 0.2:  
-            forward_cell = (current_cell[0], current_cell[1] + 1)
-            current_direction = 'E'
-        elif abs(theta_norm - math.pi / 2) < 0.2:  
-            forward_cell = (current_cell[0] - 1, current_cell[1])
-            current_direction = 'N'
-        elif abs(theta_norm - math.pi) < 0.2:  
-            forward_cell = (current_cell[0], current_cell[1] - 1)
-            current_direction = 'W'
-        elif abs(theta_norm + math.pi / 2) < 0.2 or abs(theta_norm - 3 * math.pi / 2) < 0.2:  
-            forward_cell = (current_cell[0] + 1, current_cell[1])
-            current_direction = 'S'
-        
-        
-        # doesn't check if visited - just keeps going forward until wall blocks it
-        if not walls.front and forward_cell and maze_map.in_bounds(forward_cell[0], forward_cell[1]):
-            # Check if forward cell is the exit before moving
-            if goal_detected and forward_cell == (GOAL_ROW, GOAL_COL):
-                # About to move to exit - check sensors
-                front_sensors = [ir[0], ir[7]]
-                max_front = max(front_sensors)
-                if not walls.front and max_front < IR_THRESHOLD * 0.4:
-                    # At exit - STOP!
-                    mp.stop()
-                    print(f"\n{'='*60}")
-                    print(f"✓ EXIT REACHED at step {steps}!")
-                    print(f"Final pose: ({est_x:.3f}, {est_y:.3f}, {math.degrees(est_theta):.1f}°)")
-                    print(f"Final cell: {current_cell}")
-                    print(f"Goal cell: ({GOAL_ROW}, {GOAL_COL})")
-                    print(f"Front sensors: {front_sensors[0]:.1f}, {front_sensors[1]:.1f} (no wall = exit!)")
-                    print(f"{'='*60}")
-                    break
-            
-            # Keeps going forward - doesn't stop just because cell is visited
-            move_success = execute_action(('forward', 0), walls, ir)
-            if move_success:
-                moved_at_least_once = True
-                action_executed_this_step = True
-                
-                # Check if we just moved to exit cell
-                # reestimate pose after movement
-                est_x_after, est_y_after, est_theta_after = pf.estimate_pose()
-                current_cell_after = world_to_cell(est_x_after, est_y_after)
-                
-                # reread sensors after movement
-                ir_after = irs.read()
-                walls_after = wp.classify(ir_after)
-                front_sensors_after = [ir_after[0], ir_after[7]]
-                max_front_after = max(front_sensors_after)
-                
-                # Check if it's at exit cell after movement
-                is_at_edge_after = (
-                    current_cell_after[0] == 0 or current_cell_after[0] == MAZE_ROWS - 1 or
-                    current_cell_after[1] == 0 or current_cell_after[1] == MAZE_COLS - 1
-                )
-                
-                if (goal_detected and current_cell_after == (GOAL_ROW, GOAL_COL)) or (is_at_edge_after and not walls_after.front and max_front_after < IR_THRESHOLD * 0.4):
-                    # Just moved to exit - STOP!
-                    mp.stop()
-                    print(f"\n{'='*60}")
-                    print(f"✓ EXIT REACHED at step {steps}!")
-                    print(f"Final pose: ({est_x_after:.3f}, {est_y_after:.3f}, {math.degrees(est_theta_after):.1f}°)")
-                    print(f"Final cell: {current_cell_after}")
-                    if goal_detected:
-                        print(f"Goal cell: ({GOAL_ROW}, {GOAL_COL})")
-                    print(f"Front sensors: {front_sensors_after[0]:.1f}, {front_sensors_after[1]:.1f} (no wall = exit!)")
-                    print(f"{'='*60}")
-                    break
-
-        # Wall detected in front - check sides
-        elif walls.front:
-            # Wall in front now check right/left
-            if not walls.right:
-                # Right is open turns right and explores that path
-                if execute_action(('turn', -90), walls, ir):
-                    moved_at_least_once = True
-                    action_executed_this_step = True
-                    last_cell_before_turn = current_cell
-            elif not walls.left:
-                # Left is open turns left and explores that path
-                if execute_action(('turn', 90), walls, ir):
-                    moved_at_least_once = True
-                    action_executed_this_step = True
-                    last_cell_before_turn = current_cell
-            else:
-                # Dead end all directions blocked (front, right, left)
-                # This means it's explored the entire path now backtrack
-                if exploration_stack and last_cell_before_turn != current_cell:
-                    
-                    if execute_action(('turn', 90), walls, ir):
-                        if execute_action(('turn', 90), walls, ir):
-                            moved_at_least_once = True
-                            action_executed_this_step = True
-                            current_path_cells = []  # Clear path when backtracking
-                else:
-                    
-                    if execute_action(('turn', 90), walls, ir):
-                        if execute_action(('turn', 90), walls, ir):
-                            moved_at_least_once = True
-                            action_executed_this_step = True
-    
-    # Only force action if it's truly stuck (shouldn't happen with simplified logic)
-    # But doesn't force unnecessary turns only if it can't move forward and have no other option
-    if not action_executed_this_step and walls.front:
-        # Only forces action if front is blocked and it's not done anything
-        if not walls.right:
-            if execute_action(('turn', -90), walls, ir):
-                moved_at_least_once = True
-                action_executed_this_step = True
-        elif not walls.left:
-            if execute_action(('turn', 90), walls, ir):
-                moved_at_least_once = True
-                action_executed_this_step = True
-    
-    steps += 1
-
-print(f"\n{'='*60}")
-print(f"Controller finished after {steps} steps")
-print(f"Final estimated pose: ({est_x:.3f}, {est_y:.3f}, {math.degrees(est_theta):.1f}°)")
-print(f"Final cell: {current_cell}")
-print(f"{'='*60}")
+        trial_start_time = supervisor.getTime()

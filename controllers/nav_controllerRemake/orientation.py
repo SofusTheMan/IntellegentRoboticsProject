@@ -7,8 +7,8 @@ BACK_SENSORS = [3, 4]  # ps4 and ps1 - back sensors
 def get_walls_around_robot(sensors):
     """Return a dict indicating presence of walls around the robot."""
     front_wall = sum(sensors[i].getValue() for i in FRONT_SENSORS) / len(FRONT_SENSORS) > 100
-    right_wall = sum(sensors[i].getValue() for i in RIGHT_SENSOR) / len(RIGHT_SENSOR) > 100
-    left_wall = sum(sensors[i].getValue() for i in LEFT_SENSOR) / len(LEFT_SENSOR) > 100
+    right_wall = sum(sensors[i].getValue() for i in RIGHT_SENSOR) / len(RIGHT_SENSOR) > 105
+    left_wall = sum(sensors[i].getValue() for i in LEFT_SENSOR) / len(LEFT_SENSOR) > 110
     back_wall = sum(sensors[i].getValue() for i in BACK_SENSORS) / len(BACK_SENSORS) > 100
     
     return {

@@ -3,6 +3,29 @@
 from controller import Robot, Emitter
 import struct
 import time
+import os
+import json
+
+def report_trial_complete(step_count, trial_start_time, success):
+    """
+    Report trial completion to supervisor.
+    Call this once when trial ends (success or failure).
+    """
+    elapsed_time = robot.getTime() - trial_start_time
+    
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    signal_file = os.path.join(script_dir, 'trial_complete.json')
+    
+    data = {
+        'completed': success,
+        'steps': step_count,
+        'time': elapsed_time
+    }
+    
+    with open(signal_file, 'w') as f:
+        json.dump(data, f)
+    
+    print(f"Trial complete: Success={success}, Steps={step_count}, Time={elapsed_time:.2f}s")
 
 robot = Robot()
 timestep = int(robot.getBasicTimeStep())
@@ -13,6 +36,8 @@ right_motor = robot.getDevice('right wheel motor')
 left_motor.setPosition(float('inf'))
 right_motor.setPosition(float('inf'))
 
+
+trial_start_time = robot.getTime()
 # Movement parameters
 forward_speed = 1.0
 turn_speed = 0.5
@@ -94,6 +119,7 @@ while robot.step(timestep) != -1:
                 left_motor.setVelocity(0.0)
                 right_motor.setVelocity(0.0)
                 print(f"Finished maze. Total steps: {count}")
+                report_trial_complete(count, trial_start_time, True)
                 break
             if not has_wall_right():
                 print("No wall on right - turning right to find wall")

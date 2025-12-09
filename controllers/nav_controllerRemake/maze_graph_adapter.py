@@ -35,6 +35,7 @@ class MazeGraphAdapter:
         self.cols = maze_graph_data['cols']
         self.side_length = maze_graph_data['side_length']
         self.wall_cell_ratio = maze_graph_data['wall_cell_ratio']
+        self.epuck_start = maze_graph_data.get('epuck_start', None)
         
         # Reconstruct cells dict from serialized format
         self.cells = {}
