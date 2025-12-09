@@ -3,32 +3,41 @@ from motion_primitives import MotionPrimitives
 from sensors import IRSuite
 from wall_perception import WallPerception
 from Localisation import ParticleFilter
-from maze_map import MazeMap, NORTH, EAST, SOUTH, WEST
+from maze_graph_adapter import load_maze_graph_from_file, NORTH, EAST, SOUTH, WEST
 from planner import Planner
 import math
 
 LEFT_MOTOR = "left wheel motor"
 RIGHT_MOTOR = "right wheel motor"
 
-# Maze parameters (should match maze_generator.py)
-MAZE_ROWS = 5
-MAZE_COLS = 5
-MAZE_SIDE_LENGTH = 0.6  # meters
-WALL_CELL_RATIO = 0.1
-CELL_SIZE_M = 0.09  # Actual cell size after walls
-IR_THRESHOLD = 80.0  # Wall detection threshold
+# IR threshold for wall detection
+IR_THRESHOLD = 70.0  # Wall detection threshold
 
 # Goal: Exit detection (edge cell with no wall = exit)
 # detects exit dynamically by checking edge cells with open walls
 GOAL_ROW = None  # Will be detected
 GOAL_COL = None  # Will be detected
 
+robot = Robot()
+dt = int(robot.getBasicTimeStep())
+
+# Load MazeGraph from file (created by maze_generator)
+try:
+    maze_map = load_maze_graph_from_file()
+    MAZE_ROWS = maze_map.rows
+    MAZE_COLS = maze_map.cols
+    MAZE_SIDE_LENGTH = maze_map.side_length
+    WALL_CELL_RATIO = maze_map.wall_cell_ratio
+    print(f"Loaded MazeGraph: {MAZE_ROWS}x{MAZE_COLS}, side_length={MAZE_SIDE_LENGTH}")
+except FileNotFoundError as e:
+    print(f"ERROR: {e}")
+    print("Make sure maze_generator controller runs before nav_controller!")
+    exit(1)
+
 # Calculate actual cell dimensions
 wall_width = WALL_CELL_RATIO * MAZE_SIDE_LENGTH / MAZE_ROWS
 actual_cell_size = (MAZE_SIDE_LENGTH - (MAZE_ROWS + 1) * wall_width) / MAZE_ROWS
-
-robot = Robot()
-dt = int(robot.getBasicTimeStep())
+CELL_SIZE_M = actual_cell_size  # Actual cell size after walls
 
 # Motors
 left_motor = robot.getDevice(LEFT_MOTOR)
@@ -39,8 +48,7 @@ mp = MotionPrimitives(robot, left_motor, right_motor)
 irs = IRSuite(robot, noise_sigma=0.0)
 wp = WallPerception(threshold=IR_THRESHOLD)
 
-# Map and Planner
-maze_map = MazeMap(MAZE_ROWS, MAZE_COLS)
+# Planner (uses maze_map which is now the MazeGraph adapter)
 planner = Planner(rows=MAZE_ROWS, cols=MAZE_COLS)
 # Goal will be set when exit is detected
 
@@ -91,88 +99,6 @@ def cell_to_world(r, c):
     x = wall_width + c * (actual_cell_size + wall_width) + actual_cell_size / 2.0
     y = wall_width + r * (actual_cell_size + wall_width) + actual_cell_size / 2.0
     return x, y
-
-
-def update_map_from_walls(cell_r, cell_c, walls, orientation):
-    """
-    Update map based on detected walls.
-    orientation: 0=E, π/2=N, π=W, -π/2=S
-    """
-    if not maze_map.in_bounds(cell_r, cell_c):
-        return
-    
-    # Normalize orientation
-    theta_norm = orientation % (2 * math.pi)
-    
-    # Map detected walls to map directions based on robot orientation
-    if abs(theta_norm) < 0.1 or abs(theta_norm - 2*math.pi) < 0.1:  # East
-        if walls.front:
-            maze_map.set_wall(cell_r, cell_c, EAST, True)
-        else:
-            maze_map.set_wall(cell_r, cell_c, EAST, False)
-        if walls.right:
-            maze_map.set_wall(cell_r, cell_c, SOUTH, True)
-        else:
-            maze_map.set_wall(cell_r, cell_c, SOUTH, False)
-        if walls.left:
-            maze_map.set_wall(cell_r, cell_c, NORTH, True)
-        else:
-            maze_map.set_wall(cell_r, cell_c, NORTH, False)
-        if walls.behind:
-            maze_map.set_wall(cell_r, cell_c, WEST, True)
-        else:
-            maze_map.set_wall(cell_r, cell_c, WEST, False)
-    elif abs(theta_norm - math.pi/2) < 0.1:  # North
-        if walls.front:
-            maze_map.set_wall(cell_r, cell_c, NORTH, True)
-        else:
-            maze_map.set_wall(cell_r, cell_c, NORTH, False)
-        if walls.right:
-            maze_map.set_wall(cell_r, cell_c, EAST, True)
-        else:
-            maze_map.set_wall(cell_r, cell_c, EAST, False)
-        if walls.left:
-            maze_map.set_wall(cell_r, cell_c, WEST, True)
-        else:
-            maze_map.set_wall(cell_r, cell_c, WEST, False)
-        if walls.behind:
-            maze_map.set_wall(cell_r, cell_c, SOUTH, True)
-        else:
-            maze_map.set_wall(cell_r, cell_c, SOUTH, False)
-    elif abs(theta_norm - math.pi) < 0.1:  # West
-        if walls.front:
-            maze_map.set_wall(cell_r, cell_c, WEST, True)
-        else:
-            maze_map.set_wall(cell_r, cell_c, WEST, False)
-        if walls.right:
-            maze_map.set_wall(cell_r, cell_c, NORTH, True)
-        else:
-            maze_map.set_wall(cell_r, cell_c, NORTH, False)
-        if walls.left:
-            maze_map.set_wall(cell_r, cell_c, SOUTH, True)
-        else:
-            maze_map.set_wall(cell_r, cell_c, SOUTH, False)
-        if walls.behind:
-            maze_map.set_wall(cell_r, cell_c, EAST, True)
-        else:
-            maze_map.set_wall(cell_r, cell_c, EAST, False)
-    else:  # South
-        if walls.front:
-            maze_map.set_wall(cell_r, cell_c, SOUTH, True)
-        else:
-            maze_map.set_wall(cell_r, cell_c, SOUTH, False)
-        if walls.right:
-            maze_map.set_wall(cell_r, cell_c, WEST, True)
-        else:
-            maze_map.set_wall(cell_r, cell_c, WEST, False)
-        if walls.left:
-            maze_map.set_wall(cell_r, cell_c, EAST, True)
-        else:
-            maze_map.set_wall(cell_r, cell_c, EAST, False)
-        if walls.behind:
-            maze_map.set_wall(cell_r, cell_c, NORTH, True)
-        else:
-            maze_map.set_wall(cell_r, cell_c, NORTH, False)
 
 
 def get_action_to_cell(current_cell, next_cell, current_theta):
@@ -362,9 +288,8 @@ while robot.step(dt) != -1 and steps < MAX_STEPS:
     # Get estimated pose from particle filter
     est_x, est_y, est_theta = pf.estimate_pose()
     current_cell = world_to_cell(est_x, est_y)
-    
-    # Update map based on current observations
-    update_map_from_walls(current_cell[0], current_cell[1], walls, est_theta)
+    print(f"\n[STEP {steps}] Pose Estimate: ({est_x:.3f}, {est_y:.3f}, {math.degrees(est_theta):.1f}°), Cell: {current_cell}")
+    # Mark current cell as visited (no mapping - we use the known map from maze_generator)
     maze_map.mark_visited(current_cell[0], current_cell[1])
     
     # Update particle filter with sensor data

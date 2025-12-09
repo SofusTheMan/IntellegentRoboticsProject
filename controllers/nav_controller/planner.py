@@ -1,6 +1,7 @@
 from collections import deque
 import heapq
-from maze_map import MazeMap, NORTH, EAST, SOUTH, WEST
+# Note: NORTH, EAST, SOUTH, WEST are now imported from maze_graph_adapter
+# The adapter provides the same interface as MazeMap, so this code works with both
 
 
 class Planner:

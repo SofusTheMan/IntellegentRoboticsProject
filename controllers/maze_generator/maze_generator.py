@@ -1,6 +1,8 @@
 from controller import Supervisor
 import random
 import math, random
+import json
+import os
 
 supervisor = Supervisor()
 timeStep = int(supervisor.getBasicTimeStep())
@@ -247,6 +249,19 @@ class MazeGraph:
         children_field.importMFNodeFromString(-1, epuck_node)
         print(f"Spawned e-puck at cell ({cx},{cy}) facing {orientation}")
         return (cx, cy, orientation)
+    
+    def serialize_to_file(self, filepath):
+        """Serialize MazeGraph to a JSON file for nav_controller to read."""
+        data = {
+            'rows': self.rows,
+            'cols': self.cols,
+            'side_length': self.side_length,
+            'wall_cell_ratio': self.wall_cell_ratio,
+            'cells': {f"{x}_{y}": walls for (x, y), walls in self.cells.items()}
+        }
+        with open(filepath, 'w') as f:
+            json.dump(data, f)
+        print(f"MazeGraph serialized to {filepath}")
 
 
 
@@ -289,6 +304,10 @@ maze_graph = maze_generator_DFS(maze_graph)
 print("Generating maze on X–Y plane...")
 maze_graph.generate_maze(z_height=0.05, floor_height=0.05)
 maze_graph.spawn_epuck_in_maze()
+
+# Serialize MazeGraph to file for nav_controller
+maze_graph_file = os.path.join(os.path.dirname(__file__), '..', 'nav_controller', 'maze_graph.json')
+maze_graph.serialize_to_file(maze_graph_file)
 
 while supervisor.step(timeStep) != -1:
     pass
