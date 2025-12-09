@@ -229,7 +229,7 @@ class MazeGraph:
 
         tx = wall_width + cx * (cell_size + wall_width) + cell_size / 2.0
         ty = wall_width + cy * (cell_size + wall_width) + cell_size / 2.0
-        tz = 0.035 
+        tz = 0.0
 
         orientation = random.choice(['E', 'N', 'W', 'S'])
         angle_map = {'E': 0.0, 'N': math.pi / 2.0, 'W': math.pi, 'S': -math.pi / 2.0}
@@ -240,7 +240,7 @@ class MazeGraph:
           translation {tx} {ty} {tz}
           rotation 0 0 1 {angle}
           name "e_puck_{cx}_{cy}"
-            controller "nav_controller"
+            controller "simple_wall_follower"
         }}
         '''
 
