@@ -69,20 +69,20 @@ FRONT_SENSORS = [0, 7]  # ps0 and ps7 - front sensors
 
 def has_wall_right():
     """Check if there's a wall on the right side."""
-    return sensors[RIGHT_SENSOR].getValue() > OBSTACLE_THRESHOLD
+    return sensors[RIGHT_SENSOR].getValue() > 100
 
 def has_obstacle_front():
     """Check if there's an obstacle in front."""
-    return (sensors[FRONT_SENSORS[0]].getValue() > 75 or 
-            sensors[FRONT_SENSORS[1]].getValue() > 75)
+    return (sensors[FRONT_SENSORS[0]].getValue() > 100 or 
+            sensors[FRONT_SENSORS[1]].getValue() > 100)
 
 def move_forward(distance, speed):
     """Calculate time needed to move forward by distance at given speed."""
-    return distance / speed * 48.0
+    return distance / speed * 45.0
 
 def turn_90_degrees(angular_speed):
     """Calculate time needed for 90-degree turn."""
-    return 4.4  # seconds (adjust as needed)
+    return 4.448  # seconds (adjust as needed)
 count = 0
 while robot.step(timestep) != -1:
     current_time = robot.getTime()

@@ -64,6 +64,7 @@ def create_wall(x, y, z=0.25, length=1.0, width=0.1, height=0.2):
 
 class MazeGraph:
     def __init__(self, rows, cols=None, side_length=4, wall_cell_ratio=0.1):
+        print("Initializing MazeGraph rows:", rows, "cols:", cols, "side_length:", side_length, "wall_cell_ratio:", wall_cell_ratio)
         self.rows = rows
         if cols is None:
             cols = rows
@@ -275,7 +276,8 @@ def save_results():
 
 # Initial setup
 print(f"Starting {NUM_TRIALS} trials...")
-maze_graph = maze_hex_size(10, hex_size=0.09, wall_cell_ratio=0.1)
+rows = 5
+maze_graph = maze_hex_size(rows, hex_size=0.09, wall_cell_ratio=0.1)
 maze_graph = maze_generator_DFS(maze_graph)
 maze_graph.generate_maze(z_height=0.05, floor_height=0.05)
 maze_graph.spawn_epuck_in_maze()
@@ -319,7 +321,7 @@ while supervisor.step(timeStep) != -1:
             for _ in range(10):
                 supervisor.step(timeStep)
             
-            maze_graph = maze_hex_size(10, hex_size=0.09, wall_cell_ratio=0.1)
+            maze_graph = maze_hex_size(rows, hex_size=0.09, wall_cell_ratio=0.1)
             maze_graph = maze_generator_DFS(maze_graph)
             maze_graph.generate_maze(z_height=0.05, floor_height=0.05)
             maze_graph.spawn_epuck_in_maze()
@@ -352,7 +354,7 @@ while supervisor.step(timeStep) != -1:
         for _ in range(10):
             supervisor.step(timeStep)
         
-        maze_graph = maze_hex_size(10, hex_size=0.09, wall_cell_ratio=0.1)
+        maze_graph = maze_hex_size(rows, hex_size=0.09, wall_cell_ratio=0.1)
         maze_graph = maze_generator_DFS(maze_graph)
         maze_graph.generate_maze(z_height=0.05, floor_height=0.05)
         maze_graph.spawn_epuck_in_maze()
