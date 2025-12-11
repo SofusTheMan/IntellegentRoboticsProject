@@ -8,11 +8,11 @@ import time
 supervisor = Supervisor()
 timeStep = int(supervisor.getBasicTimeStep())
 
-# ==================== CONFIGURATION ====================
+
 NUM_TRIALS = 50  # Number of maze trials to run
 TRIAL_TIMEOUT = 9000.0  # Maximum time per trial in seconds (5 minutes)
 RESULTS_FILE = "maze_solver_results.json"
-# =======================================================
+
 
 trial_results = []
 current_trial = 0
