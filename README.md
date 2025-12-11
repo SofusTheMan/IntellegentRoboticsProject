@@ -35,19 +35,38 @@ Dijkstra's Algorithm: For finding the shortest path on the graph representation 
 Based on the codebase organization:
 
 IntellegentRoboticsProject/
+├── README.md
 ├── Simulation/
+│   └── simulationRandomLocalIntoFinish.py
 ├── Worlds/
+│   └── beginner_move_your_e-puck.wbt
 └── controllers/
     ├── maze_generator/
-    └── nav_controller/
-        ├── epuck_maze_controller.py
-        ├── particle_filter.py
-        ├── path_planner.py
-        ├── nav_controller.py
-        ├── motion_primitives.py
-        ├── wall_perception.py
-        ├── map_graph_client.py
-        └── sensors.py
+    │   └── maze_generator.py
+    ├── nav_controller/
+    │   ├── epuck_maze_controller.py
+    │   ├── Localisation.py
+    │   ├── particle_filter.py
+    │   ├── planner.py
+    │   ├── nav_controller.py
+    │   ├── motion_primitives.py
+    │   ├── wall_perception.py
+    │   ├── sensors.py
+    │   ├── map_graph_client.py
+    │   ├── maze_graph_adapter.py
+    │   ├── maze_graph.json
+    │   ├── maze_map.py
+    │   └── simple_policy.py
+    ├── nav_controllerRemake/
+    │   ├── nav_controllerRemake.py
+    │   ├── make_action.py
+    │   ├── next_action.py
+    │   ├── update_possible_positions.py
+    │   ├── orientation.py
+    │   ├── maze_graph_adapter.py
+    │   └── maze_graph.json
+    └── simple_wall_follower/
+        └── simple_wall_follower.py
 
 
 # Getting Started
