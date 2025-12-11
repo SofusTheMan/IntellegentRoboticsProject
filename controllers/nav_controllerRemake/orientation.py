@@ -1,6 +1,6 @@
 OBSTACLE_THRESHOLD = 73
-RIGHT_SENSOR = [1, 2]  # ps2 - right side sensor
-LEFT_SENSOR = [5, 6]  # ps5 - left side sensor
+RIGHT_SENSOR = [2]  # ps2 - right side sensor
+LEFT_SENSOR = [5]  # ps5 - left side sensor
 FRONT_SENSORS = [0, 7]  # ps0 and ps7 - front sensors
 BACK_SENSORS = [3, 4]  # ps4 and ps1 - back sensors
 

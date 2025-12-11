@@ -1,18 +1,18 @@
 {
   "statistics": {
     "total_trials": 100,
-    "completed": 100,
-    "failed": 0,
-    "success_rate": 100.0,
+    "completed": 95,
+    "failed": 5,
+    "success_rate": 95.0,
     "steps": {
       "min": 1,
-      "max": 85,
-      "avg": 43.3
+      "max": 50,
+      "avg": 16.9
     },
     "time": {
-      "min": 0.03,
-      "max": 380.26,
-      "avg": 191.49
+      "min": 4.61,
+      "max": 225.47,
+      "avg": 76.64
     }
   },
   "trials": [
@@ -20,701 +20,701 @@
       "trial": 1,
       "completed": true,
       "timeout": false,
-      "time": 172.16,
-      "steps": 39
+      "time": 58.75,
+      "steps": 13
     },
     {
       "trial": 2,
       "completed": true,
       "timeout": false,
-      "time": 221.89,
-      "steps": 50
+      "time": 144.77,
+      "steps": 32
     },
     {
       "trial": 3,
       "completed": true,
       "timeout": false,
-      "time": 72.42,
-      "steps": 17
+      "time": 63.33,
+      "steps": 14
     },
     {
       "trial": 4,
       "completed": true,
       "timeout": false,
-      "time": 326.02,
-      "steps": 73
+      "time": 162.69,
+      "steps": 36
     },
     {
       "trial": 5,
       "completed": true,
       "timeout": false,
-      "time": 244.58,
-      "steps": 55
+      "time": 58.85,
+      "steps": 13
     },
     {
       "trial": 6,
       "completed": true,
       "timeout": false,
-      "time": 86.18,
-      "steps": 20
+      "time": 54.3,
+      "steps": 12
     },
     {
       "trial": 7,
       "completed": true,
       "timeout": false,
-      "time": 68.03,
-      "steps": 16
+      "time": 9.12,
+      "steps": 2
     },
     {
       "trial": 8,
       "completed": true,
       "timeout": false,
-      "time": 45.38,
-      "steps": 11
+      "time": 90.24,
+      "steps": 20
     },
     {
       "trial": 9,
       "completed": true,
       "timeout": false,
-      "time": 181.06,
-      "steps": 41
+      "time": 99.49,
+      "steps": 22
     },
     {
       "trial": 10,
       "completed": true,
       "timeout": false,
-      "time": 199.17,
-      "steps": 45
+      "time": 85.98,
+      "steps": 19
     },
     {
       "trial": 11,
       "completed": true,
       "timeout": false,
-      "time": 208.42,
-      "steps": 47
+      "time": 27.17,
+      "steps": 6
     },
     {
       "trial": 12,
       "completed": true,
       "timeout": false,
-      "time": 294.11,
-      "steps": 66
+      "time": 27.17,
+      "steps": 6
     },
     {
       "trial": 13,
       "completed": true,
       "timeout": false,
-      "time": 40.8,
-      "steps": 10
+      "time": 18.18,
+      "steps": 4
     },
     {
       "trial": 14,
       "completed": true,
       "timeout": false,
-      "time": 330.59,
-      "steps": 74
+      "time": 49.76,
+      "steps": 11
     },
     {
       "trial": 15,
       "completed": true,
       "timeout": false,
-      "time": 99.68,
-      "steps": 23
+      "time": 18.21,
+      "steps": 4
     },
     {
       "trial": 16,
       "completed": true,
       "timeout": false,
-      "time": 63.39,
-      "steps": 15
+      "time": 158.3,
+      "steps": 35
     },
     {
       "trial": 17,
       "completed": true,
       "timeout": false,
-      "time": 85.95,
-      "steps": 20
+      "time": 36.22,
+      "steps": 8
     },
     {
       "trial": 18,
       "completed": true,
       "timeout": false,
-      "time": 353.38,
-      "steps": 79
+      "time": 81.47,
+      "steps": 18
     },
     {
       "trial": 19,
       "completed": true,
       "timeout": false,
-      "time": 45.44,
-      "steps": 11
+      "time": 9.12,
+      "steps": 2
     },
     {
       "trial": 20,
       "completed": true,
       "timeout": false,
-      "time": 0.03,
-      "steps": 1
+      "time": 117.54,
+      "steps": 26
     },
     {
       "trial": 21,
       "completed": true,
       "timeout": false,
-      "time": 122.46,
+      "time": 126.53,
       "steps": 28
     },
     {
       "trial": 22,
       "completed": true,
       "timeout": false,
-      "time": 285.41,
-      "steps": 64
+      "time": 67.87,
+      "steps": 15
     },
     {
       "trial": 23,
       "completed": true,
       "timeout": false,
-      "time": 140.48,
-      "steps": 32
+      "time": 40.74,
+      "steps": 9
     },
     {
       "trial": 24,
       "completed": true,
       "timeout": false,
-      "time": 312.35,
-      "steps": 70
+      "time": 54.27,
+      "steps": 12
     },
     {
       "trial": 25,
-      "completed": true,
+      "completed": false,
       "timeout": false,
-      "time": 81.47,
-      "steps": 19
+      "time": 1151.14,
+      "steps": 255
     },
     {
       "trial": 26,
       "completed": true,
       "timeout": false,
-      "time": 108.7,
-      "steps": 25
+      "time": 185.12,
+      "steps": 41
     },
     {
       "trial": 27,
       "completed": true,
       "timeout": false,
-      "time": 90.53,
-      "steps": 21
+      "time": 117.6,
+      "steps": 26
     },
     {
       "trial": 28,
       "completed": true,
       "timeout": false,
-      "time": 31.78,
-      "steps": 8
+      "time": 153.7,
+      "steps": 34
     },
     {
       "trial": 29,
       "completed": true,
       "timeout": false,
-      "time": 144.86,
-      "steps": 33
+      "time": 49.6,
+      "steps": 11
     },
     {
       "trial": 30,
       "completed": true,
       "timeout": false,
-      "time": 72.67,
-      "steps": 17
+      "time": 68.0,
+      "steps": 15
     },
     {
       "trial": 31,
       "completed": true,
       "timeout": false,
-      "time": 185.63,
-      "steps": 42
+      "time": 103.97,
+      "steps": 23
     },
     {
       "trial": 32,
       "completed": true,
       "timeout": false,
-      "time": 249.18,
-      "steps": 56
+      "time": 72.26,
+      "steps": 16
     },
     {
       "trial": 33,
       "completed": true,
       "timeout": false,
-      "time": 122.24,
-      "steps": 28
+      "time": 225.47,
+      "steps": 50
     },
     {
       "trial": 34,
       "completed": true,
       "timeout": false,
-      "time": 212.83,
-      "steps": 48
+      "time": 122.02,
+      "steps": 27
     },
     {
       "trial": 35,
       "completed": true,
       "timeout": false,
-      "time": 325.92,
-      "steps": 73
+      "time": 85.73,
+      "steps": 19
     },
     {
       "trial": 36,
       "completed": true,
       "timeout": false,
-      "time": 285.44,
-      "steps": 64
+      "time": 99.55,
+      "steps": 22
     },
     {
       "trial": 37,
       "completed": true,
       "timeout": false,
-      "time": 172.16,
-      "steps": 39
+      "time": 117.7,
+      "steps": 26
     },
     {
       "trial": 38,
       "completed": true,
       "timeout": false,
-      "time": 144.83,
-      "steps": 33
+      "time": 72.29,
+      "steps": 16
     },
     {
       "trial": 39,
       "completed": true,
       "timeout": false,
-      "time": 199.23,
-      "steps": 45
+      "time": 90.46,
+      "steps": 20
     },
     {
       "trial": 40,
       "completed": true,
       "timeout": false,
-      "time": 312.42,
-      "steps": 70
+      "time": 104.0,
+      "steps": 23
     },
     {
       "trial": 41,
       "completed": true,
       "timeout": false,
-      "time": 122.34,
-      "steps": 28
+      "time": 72.42,
+      "steps": 16
     },
     {
       "trial": 42,
-      "completed": true,
+      "completed": false,
       "timeout": false,
-      "time": 289.7,
-      "steps": 65
+      "time": 27.07,
+      "steps": 6
     },
     {
       "trial": 43,
       "completed": true,
       "timeout": false,
-      "time": 181.18,
-      "steps": 41
+      "time": 58.82,
+      "steps": 13
     },
     {
       "trial": 44,
       "completed": true,
       "timeout": false,
-      "time": 285.28,
-      "steps": 64
+      "time": 81.47,
+      "steps": 18
     },
     {
       "trial": 45,
       "completed": true,
       "timeout": false,
-      "time": 22.72,
-      "steps": 6
+      "time": 99.3,
+      "steps": 22
     },
     {
       "trial": 46,
       "completed": true,
       "timeout": false,
-      "time": 367.04,
-      "steps": 82
+      "time": 40.8,
+      "steps": 9
     },
     {
       "trial": 47,
       "completed": true,
       "timeout": false,
-      "time": 158.53,
-      "steps": 36
+      "time": 85.95,
+      "steps": 19
     },
     {
       "trial": 48,
       "completed": true,
       "timeout": false,
-      "time": 303.23,
-      "steps": 68
+      "time": 104.1,
+      "steps": 23
     },
     {
       "trial": 49,
       "completed": true,
       "timeout": false,
-      "time": 203.81,
-      "steps": 46
+      "time": 27.17,
+      "steps": 6
     },
     {
       "trial": 50,
       "completed": true,
       "timeout": false,
-      "time": 289.98,
-      "steps": 65
+      "time": 13.7,
+      "steps": 3
     },
     {
       "trial": 51,
       "completed": true,
       "timeout": false,
-      "time": 67.9,
-      "steps": 16
+      "time": 81.12,
+      "steps": 18
     },
     {
       "trial": 52,
       "completed": true,
       "timeout": false,
-      "time": 298.82,
-      "steps": 67
+      "time": 49.82,
+      "steps": 11
     },
     {
       "trial": 53,
       "completed": true,
       "timeout": false,
-      "time": 375.84,
-      "steps": 84
+      "time": 54.37,
+      "steps": 12
     },
     {
       "trial": 54,
       "completed": true,
       "timeout": false,
-      "time": 194.69,
-      "steps": 44
+      "time": 68.0,
+      "steps": 15
     },
     {
       "trial": 55,
-      "completed": true,
+      "completed": false,
       "timeout": false,
-      "time": 117.63,
-      "steps": 27
+      "time": 1327.84,
+      "steps": 294
     },
     {
       "trial": 56,
       "completed": true,
       "timeout": false,
-      "time": 22.66,
+      "time": 27.23,
       "steps": 6
     },
     {
       "trial": 57,
       "completed": true,
       "timeout": false,
-      "time": 167.74,
-      "steps": 38
+      "time": 162.62,
+      "steps": 36
     },
     {
       "trial": 58,
       "completed": true,
       "timeout": false,
-      "time": 357.86,
-      "steps": 80
+      "time": 22.69,
+      "steps": 5
     },
     {
       "trial": 59,
       "completed": true,
       "timeout": false,
-      "time": 289.63,
-      "steps": 65
+      "time": 13.66,
+      "steps": 3
     },
     {
       "trial": 60,
       "completed": true,
       "timeout": false,
-      "time": 158.59,
-      "steps": 36
+      "time": 99.3,
+      "steps": 22
     },
     {
       "trial": 61,
       "completed": true,
       "timeout": false,
-      "time": 253.7,
-      "steps": 57
+      "time": 4.61,
+      "steps": 1
     },
     {
       "trial": 62,
       "completed": true,
       "timeout": false,
-      "time": 321.63,
-      "steps": 72
+      "time": 63.26,
+      "steps": 14
     },
     {
       "trial": 63,
       "completed": true,
       "timeout": false,
-      "time": 58.88,
-      "steps": 14
+      "time": 149.15,
+      "steps": 33
     },
     {
       "trial": 64,
       "completed": true,
       "timeout": false,
-      "time": 298.85,
-      "steps": 67
+      "time": 190.08,
+      "steps": 42
     },
     {
       "trial": 65,
       "completed": true,
       "timeout": false,
-      "time": 126.85,
-      "steps": 29
+      "time": 86.02,
+      "steps": 19
     },
     {
       "trial": 66,
       "completed": true,
       "timeout": false,
-      "time": 172.22,
-      "steps": 39
+      "time": 22.69,
+      "steps": 5
     },
     {
       "trial": 67,
       "completed": true,
       "timeout": false,
-      "time": 131.46,
-      "steps": 30
+      "time": 49.89,
+      "steps": 11
     },
     {
       "trial": 68,
       "completed": true,
       "timeout": false,
-      "time": 144.86,
-      "steps": 33
+      "time": 95.07,
+      "steps": 21
     },
     {
       "trial": 69,
       "completed": true,
       "timeout": false,
-      "time": 27.23,
-      "steps": 7
+      "time": 63.36,
+      "steps": 14
     },
     {
       "trial": 70,
       "completed": true,
       "timeout": false,
-      "time": 181.15,
-      "steps": 41
+      "time": 72.29,
+      "steps": 16
     },
     {
       "trial": 71,
       "completed": true,
       "timeout": false,
-      "time": 222.14,
-      "steps": 50
+      "time": 58.72,
+      "steps": 13
     },
     {
       "trial": 72,
       "completed": true,
       "timeout": false,
-      "time": 208.42,
-      "steps": 47
+      "time": 126.72,
+      "steps": 28
     },
     {
       "trial": 73,
-      "completed": true,
+      "completed": false,
       "timeout": false,
-      "time": 380.26,
-      "steps": 85
+      "time": 27.14,
+      "steps": 6
     },
     {
       "trial": 74,
       "completed": true,
       "timeout": false,
-      "time": 226.62,
-      "steps": 51
+      "time": 31.71,
+      "steps": 7
     },
     {
       "trial": 75,
       "completed": true,
       "timeout": false,
-      "time": 299.07,
-      "steps": 67
+      "time": 72.22,
+      "steps": 16
     },
     {
       "trial": 76,
       "completed": true,
       "timeout": false,
-      "time": 244.42,
-      "steps": 55
+      "time": 63.33,
+      "steps": 14
     },
     {
       "trial": 77,
       "completed": true,
       "timeout": false,
-      "time": 117.79,
-      "steps": 27
+      "time": 135.55,
+      "steps": 30
     },
     {
       "trial": 78,
       "completed": true,
       "timeout": false,
-      "time": 117.66,
-      "steps": 27
+      "time": 112.96,
+      "steps": 25
     },
     {
       "trial": 79,
       "completed": true,
       "timeout": false,
-      "time": 335.01,
-      "steps": 75
+      "time": 22.69,
+      "steps": 5
     },
     {
       "trial": 80,
       "completed": true,
       "timeout": false,
-      "time": 86.11,
-      "steps": 20
+      "time": 9.15,
+      "steps": 2
     },
     {
       "trial": 81,
       "completed": true,
       "timeout": false,
-      "time": 140.35,
-      "steps": 32
+      "time": 72.32,
+      "steps": 16
     },
     {
       "trial": 82,
       "completed": true,
       "timeout": false,
-      "time": 104.19,
-      "steps": 24
+      "time": 58.85,
+      "steps": 13
     },
     {
       "trial": 83,
       "completed": true,
       "timeout": false,
-      "time": 145.06,
-      "steps": 33
+      "time": 81.47,
+      "steps": 18
     },
     {
       "trial": 84,
       "completed": true,
       "timeout": false,
-      "time": 330.62,
-      "steps": 74
+      "time": 31.84,
+      "steps": 7
     },
     {
       "trial": 85,
       "completed": true,
       "timeout": false,
-      "time": 217.5,
-      "steps": 49
+      "time": 54.37,
+      "steps": 12
     },
     {
       "trial": 86,
       "completed": true,
       "timeout": false,
-      "time": 81.47,
-      "steps": 19
+      "time": 58.75,
+      "steps": 13
     },
     {
       "trial": 87,
       "completed": true,
       "timeout": false,
-      "time": 158.62,
-      "steps": 36
+      "time": 13.66,
+      "steps": 3
     },
     {
       "trial": 88,
       "completed": true,
       "timeout": false,
-      "time": 190.21,
-      "steps": 43
+      "time": 171.74,
+      "steps": 38
     },
     {
       "trial": 89,
-      "completed": true,
+      "completed": false,
       "timeout": false,
-      "time": 330.82,
-      "steps": 74
+      "time": 9.09,
+      "steps": 2
     },
     {
       "trial": 90,
       "completed": true,
       "timeout": false,
-      "time": 135.81,
-      "steps": 31
+      "time": 22.69,
+      "steps": 5
     },
     {
       "trial": 91,
       "completed": true,
       "timeout": false,
-      "time": 271.87,
-      "steps": 61
+      "time": 131.17,
+      "steps": 29
     },
     {
       "trial": 92,
       "completed": true,
       "timeout": false,
-      "time": 99.65,
-      "steps": 23
+      "time": 45.41,
+      "steps": 10
     },
     {
       "trial": 93,
       "completed": true,
       "timeout": false,
-      "time": 280.64,
-      "steps": 63
+      "time": 36.26,
+      "steps": 8
     },
     {
       "trial": 94,
       "completed": true,
       "timeout": false,
-      "time": 294.34,
-      "steps": 66
+      "time": 90.5,
+      "steps": 20
     },
     {
       "trial": 95,
       "completed": true,
       "timeout": false,
-      "time": 285.28,
-      "steps": 64
+      "time": 72.42,
+      "steps": 16
     },
     {
       "trial": 96,
       "completed": true,
       "timeout": false,
-      "time": 212.74,
-      "steps": 48
+      "time": 67.74,
+      "steps": 15
     },
     {
       "trial": 97,
       "completed": true,
       "timeout": false,
-      "time": 13.66,
-      "steps": 4
+      "time": 135.42,
+      "steps": 30
     },
     {
       "trial": 98,
       "completed": true,
       "timeout": false,
-      "time": 289.89,
-      "steps": 65
+      "time": 117.63,
+      "steps": 26
     },
     {
       "trial": 99,
       "completed": true,
       "timeout": false,
-      "time": 262.5,
-      "steps": 59
+      "time": 58.72,
+      "steps": 13
     },
     {
       "trial": 100,
       "completed": true,
       "timeout": false,
-      "time": 334.94,
-      "steps": 75
+      "time": 40.7,
+      "steps": 9
     }
   ]
 }

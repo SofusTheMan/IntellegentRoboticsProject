@@ -274,6 +274,32 @@ def save_results():
         print(f"Steps: {stats['steps']['min']}-{stats['steps']['max']} (avg {stats['steps']['avg']})")
         print(f"Time: {stats['time']['min']}-{stats['time']['max']}s (avg {stats['time']['avg']}s)")
 
+
+def setup_camera_view():
+    """Set camera to overhead view of the maze."""
+    camera = supervisor.getFromDef('CAMERA')
+    if camera is None:
+        print("WARNING: Camera node not found. Make sure it has DEF CAMERA in the world file.")
+        return
+    
+    # Set position (overhead view)
+    position_field = camera.getField('position')
+    if position_field:
+        position_field.setSFVec3f([-0.2, 0.4, 3.9])
+        print(f"Camera position set: {position_field.getSFVec3f()}")
+    else:
+        print("WARNING: position field not found")
+    
+    # Set orientation (looking down)
+    orientation_field = camera.getField('orientation')
+    if orientation_field:
+        orientation_field.setSFRotation([-0.655724, 0.550121, 0.568811, 1.9326])
+        print(f"Camera orientation set: {orientation_field.getSFRotation()}")
+    else:
+        print("WARNING: orientation field not found")
+    
+    print("Camera positioned for overhead maze view")
+
 # Initial setup
 print(f"Starting {NUM_TRIALS} trials...")
 rows = 5
@@ -320,6 +346,7 @@ while supervisor.step(timeStep) != -1:
             supervisor.simulationReset()
             for _ in range(10):
                 supervisor.step(timeStep)
+            setup_camera_view()
             
             maze_graph = maze_hex_size(rows, hex_size=0.09, wall_cell_ratio=0.1)
             maze_graph = maze_generator_DFS(maze_graph)

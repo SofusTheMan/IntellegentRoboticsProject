@@ -84,6 +84,7 @@ except FileNotFoundError as e:
     exit(1)
 
 # State machine
+STATE_INITIAL_OBSERVE = -1  # NEW: Initial observation before first action
 STATE_IDLE = 0           # Deciding what to do
 STATE_EXECUTING = 1      # Executing an action
 
@@ -92,7 +93,7 @@ ACTION_FORWARD = 0
 ACTION_TURN_RIGHT = 1
 ACTION_TURN_LEFT = 2
 
-state = STATE_IDLE
+state = STATE_INITIAL_OBSERVE  # Start with initial observation
 current_action = None
 action_start_time = 0
 
@@ -170,7 +171,24 @@ def turn_90_time():
 while robot.step(timestep) != -1:
     current_time = robot.getTime()
     
-    if state == STATE_IDLE:
+    if state == STATE_INITIAL_OBSERVE:
+        # NEW: Perform initial observation before any action
+        print("=== INITIAL OBSERVATION ===")
+        print(f"Initial possible positions: {len(possible_positions)}")
+        
+        # Filter positions based on initial sensor readings
+        possible_positions = observe_and_filter(sensors, possible_positions, maze_map)
+        
+        print(f"After initial observation: {len(possible_positions)} possible positions")
+        if len(possible_positions) == 0:
+            print("ERROR: No valid positions after initial observation!")
+            report_trial_complete(step_count, trial_start_time, False)
+            break
+        
+        # Transition to IDLE to start making decisions
+        state = STATE_IDLE
+    
+    elif state == STATE_IDLE:
         # We just finished an action (or starting fresh)
         # Decide what to do next
         # print(f"\n=== STEP {step_count} ===")
@@ -184,10 +202,17 @@ while robot.step(timestep) != -1:
         # Choose the majority action but ignore None votes
         non_none_actions = [a for a in actions if a is not None]
         if non_none_actions:
-            next_action = random.choice(non_none_actions)
+            weighted = []
+            for a in non_none_actions:
+                if a == ACTION_FORWARD:
+                    # Favor moving forward by doubling its entries
+                    weighted.extend([a, a])
+                else:
+                    weighted.append(a)
+            next_action = random.choice(weighted)
         else:
             next_action = None 
-        if len(possible_positions) == 1 and possible_positions[0][0] == find_exit_cell(maze_map)[0] and possible_positions[0][1] == find_exit_cell(maze_map)[1]:
+        if next_action is None and any(pos[:2] == find_exit_cell(maze_map) for pos in possible_positions):
             # Finished maze
             left_motor.setVelocity(0.0)
             right_motor.setVelocity(0.0)
@@ -195,6 +220,8 @@ while robot.step(timestep) != -1:
             report_trial_complete(step_count, trial_start_time, True)
             break
         elif next_action is None:
+            print(sensors)
+            print(orientation.get_walls_around_robot(sensors))
             print(possible_positions)
             print(find_exit_cell(maze_map))
         
