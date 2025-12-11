@@ -2,13 +2,8 @@ NORTH, EAST, SOUTH, WEST = 0, 1, 2, 3
 
 
 def update_possible_positions(walls, possible_positions, maze_map):
-    """
-    Keep only positions/orientations that match the detected walls.
-    walls: dict with {front, right, left, back} booleans
-    possible_positions: list of (r, c, orientation)
-    maze_map: MazeGraph instance
-    """
-
+   # Keep only positions/orientations that match the detected walls.
+   
     # Map robot orientation + relative direction → absolute maze direction
     dir_map = {
         NORTH : {"front": "N", "back": "S", "left": "W", "right": "E"},
