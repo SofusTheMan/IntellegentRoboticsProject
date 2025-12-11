@@ -56,10 +56,10 @@ class ParticleFilter:
             p[1] += df * math.sin(p[2])
 
     def _get_expected_walls(self, x, y, theta):
-        """
-        Get expected wall configuration at particle pose.
-        Returns: (front, right, left, behind) as booleans
-        """
+        
+        # Get expected wall configuration at particle pose.
+       #  Returns: (front, right, left, behind) as booleans
+        
         if self.maze_map is None:
             return (False, False, False, False)
         
@@ -105,10 +105,10 @@ class ParticleFilter:
         return (front_wall, right_wall, left_wall, behind_wall)
 
     def update(self, ir_readings, walls_detected):
-        """
-        Update weights using sensor data.
-        walls_detected: Walls object with front, right, left, behind booleans
-        """
+        
+       # Update weights using sensor data.
+     # walls_detected: Walls object with front, right, left, behind booleans
+        
         if self.maze_map is None:
             # If no map, use uniform weights
             w = 1.0 / self.num_particles
