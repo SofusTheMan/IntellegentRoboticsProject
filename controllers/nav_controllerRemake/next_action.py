@@ -1,8 +1,7 @@
-"""
-Optimal maze solver for DFS-generated mazes.
-Since DFS creates a spanning tree (no loops), there's exactly one path to the exit.
-We use BFS to find the shortest path from current position to exit.
-"""
+
+# Optimal maze solver for DFS-generated mazes.
+# Since DFS creates a spanning tree (no loops), there's exactly one path to the exit.We use BFS to find the shortest path from current position to exit.
+
 
 from collections import deque
 
@@ -124,10 +123,10 @@ def turns_needed(current_orient, target_orient):
         return STATE_TURN_LEFT, 1  # Turn left once (same as right 3 times)
     
 def next_action_optimal(maze_graph, position):
-    """
-    Decide the optimal next action to solve the maze fastest.
-    Uses BFS to find shortest path, then determines next move.
-    """
+    
+    # Decide the optimal next action to solve the maze fastest.
+    # Uses BFS to find shortest path, then determines next move.
+    
     x, y, orient = position
     
     # Get shortest path to exit
